@@ -17,15 +17,24 @@ import {
   deleteClassroom,
   deleteStudentRecord,
   extractFriendlyFirestoreError,
+  normalizeJoinCode,
   seedDemoDataForTeacher,
   subscribeClassStudents,
+  updateClassroom,
   updateStudentRecord,
 } from '../services/firestoreService';
-import type { Classroom, StudentRecord } from '../types';
+import type { Classroom, Exam, StudentRecord, Submission } from '../types';
+import {
+  computeClassScoreStats,
+  computeStudentPerformanceInClass,
+} from '../utils/classStats';
 
 interface ClassesViewProps {
   teacherId: string;
   classes: Classroom[];
+  submissions?: Submission[];
+  exams?: Exam[];
+  onOpenSubmission?: (submissionId: string) => void;
   openCreateModalSignal?: number;
   onConsumeCreateSignal?: () => void;
 }
@@ -33,10 +42,14 @@ interface ClassesViewProps {
 export function ClassesView({
   teacherId,
   classes,
+  submissions = [],
+  exams = [],
+  onOpenSubmission,
   openCreateModalSignal = 0,
   onConsumeCreateSignal,
 }: ClassesViewProps) {
   const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [classStatsExamId, setClassStatsExamId] = useState<string>('all');
   const pendingClassIdRef = useRef<string | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,11 +59,22 @@ export function ClassesView({
   // Create class modal
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [className, setClassName] = useState('');
+  const [classJoinCode, setClassJoinCode] = useState('');
   const [classSubject, setClassSubject] = useState('Vật lí 12');
   const [classGrade, setClassGrade] = useState('Khối 12');
   const [creatingClass, setCreatingClass] = useState(false);
   const [createClassError, setCreateClassError] = useState<string | null>(null);
   const [seedingSample, setSeedingSample] = useState(false);
+
+  // Edit class / joinCode modal
+  const [editingClass, setEditingClass] = useState<Classroom | null>(null);
+  const [editClassName, setEditClassName] = useState('');
+  const [editClassJoinCode, setEditClassJoinCode] = useState('');
+  const [editClassSubject, setEditClassSubject] = useState('');
+  const [editClassGrade, setEditClassGrade] = useState('');
+  const [editClassYear, setEditClassYear] = useState('');
+  const [savingClassEdit, setSavingClassEdit] = useState(false);
+  const [editClassError, setEditClassError] = useState<string | null>(null);
 
   // Bulk import / add student modal
   const [showImportModal, setShowImportModal] = useState(false);
@@ -137,15 +161,60 @@ export function ClassesView({
         subject: classSubject.trim() || 'Vật lí',
         grade: classGrade.trim() || 'Khối 12',
         academicYear: '2025–2026',
+        ...(classJoinCode.trim() ? { joinCode: classJoinCode.trim() } : {}),
       });
       pendingClassIdRef.current = id;
       setSelectedClassId(id);
       setClassName('');
+      setClassJoinCode('');
       setShowCreateClass(false);
     } catch (err) {
       setCreateClassError(extractFriendlyFirestoreError(err));
     } finally {
       setCreatingClass(false);
+    }
+  };
+
+  const openEditClassModal = (cls: Classroom) => {
+    setEditClassError(null);
+    setEditingClass(cls);
+    setEditClassName(cls.name);
+    setEditClassJoinCode(cls.joinCode);
+    setEditClassSubject(cls.subject);
+    setEditClassGrade(cls.grade || '');
+    setEditClassYear(cls.academicYear || '2025–2026');
+  };
+
+  const handleSaveClassEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClass) return;
+    if (!editClassName.trim()) {
+      setEditClassError('Vui lòng nhập tên lớp học.');
+      return;
+    }
+    const cleanCode = normalizeJoinCode(editClassJoinCode);
+    if (cleanCode.length < 3 || cleanCode.length > 20) {
+      setEditClassError(
+        'Mã lớp phải dài từ 3 đến 20 ký tự, chỉ gồm chữ không dấu, số, dấu gạch dưới (_) hoặc gạch ngang (-).'
+      );
+      return;
+    }
+
+    setSavingClassEdit(true);
+    setEditClassError(null);
+    try {
+      await updateClassroom(editingClass.id, teacherId, {
+        name: editClassName.trim(),
+        joinCode: cleanCode,
+        subject: editClassSubject.trim() || editingClass.subject,
+        grade: editClassGrade.trim(),
+        academicYear: editClassYear.trim() || editingClass.academicYear,
+      });
+      setEditingClass(null);
+    } catch (err) {
+      setEditClassError(extractFriendlyFirestoreError(err));
+    } finally {
+      setSavingClassEdit(false);
     }
   };
 
@@ -374,17 +443,30 @@ export function ClassesView({
                       {cls.subject} · {cls.grade || 'THPT'}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClass(cls.id);
-                    }}
-                    title="Xoá lớp"
-                    className="p-1.5 rounded-lg text-[#698078] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditClassModal(cls);
+                      }}
+                      title="Sửa tên lớp & mã lớp"
+                      className="p-1.5 rounded-lg text-[#4A615A] hover:text-[#0F4C3F] hover:bg-[#EFF7F3] transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClass(cls.id);
+                      }}
+                      title="Xoá lớp"
+                      className="p-1.5 rounded-lg text-[#698078] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-[#EBF1EE] flex items-center justify-between text-xs">
@@ -451,6 +533,15 @@ export function ClassesView({
                 </button>
                 <button
                   type="button"
+                  onClick={() => openEditClassModal(activeClass)}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-[#CEDCD6] bg-white text-[11px] font-semibold text-[#0F4C3F] hover:bg-[#EFF7F3] cursor-pointer"
+                  title="Chỉnh sửa tên lớp, môn học hoặc mã lớp"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Sửa mã lớp</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() =>
                     handleCopyCode(
                       `${window.location.origin}/?classCode=${encodeURIComponent(activeClass.joinCode)}`
@@ -494,6 +585,73 @@ export function ClassesView({
             </div>
           </div>
 
+          {/* Class Score Summary Strip */}
+          {(() => {
+            const examFilteredSubs =
+              classStatsExamId === 'all'
+                ? submissions
+                : submissions.filter((s) => s.examId === classStatsExamId);
+            const clsStat = computeClassScoreStats(examFilteredSubs, [activeClass], {
+              includeEmptyClasses: true,
+            })[0];
+            return (
+              <div className="p-4 rounded-2xl bg-[#F8FAF9] border border-[#E6EEEA] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#0F4C3F]">
+                    Thống kê điểm lớp {activeClass.name}
+                  </div>
+                  {exams.length > 0 && (
+                    <select
+                      value={classStatsExamId}
+                      onChange={(e) => setClassStatsExamId(e.target.value)}
+                      className="px-3 py-1 rounded-lg border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] focus:outline-none focus:border-[#0F4C3F] max-w-[230px]"
+                    >
+                      <option value="all">Tất cả các đề</option>
+                      {exams.map((ex) => (
+                        <option key={ex.id} value={ex.id}>
+                          {ex.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-white border border-[#DAE5E0]">
+                    <div className="text-[#597169]">Số bài đã nộp</div>
+                    <div className="font-serif text-xl font-semibold text-[#0D221D] mt-0.5 tabular-nums">
+                      {clsStat?.submissionCount || 0} bài
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white border border-[#EAD8A6]">
+                    <div className="text-[#8A630D]">Điểm TB (thang 10)</div>
+                    <div className="font-serif text-xl font-semibold text-[#0A362C] mt-0.5 tabular-nums">
+                      {clsStat && clsStat.submissionCount > 0
+                        ? `${clsStat.avgScore10.toFixed(2)}/10`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white border border-[#DAE5E0]">
+                    <div className="text-[#597169]">Tỉ lệ đạt (≥ 5,0)</div>
+                    <div className="font-serif text-xl font-semibold text-[#0F6D4F] mt-0.5 tabular-nums">
+                      {clsStat && clsStat.submissionCount > 0
+                        ? `${clsStat.passRate}%`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white border border-[#DAE5E0]">
+                    <div className="text-[#597169]">Cao nhất / Thấp nhất</div>
+                    <div className="font-serif text-lg font-semibold text-[#0D221D] mt-0.5 tabular-nums">
+                      {clsStat && clsStat.submissionCount > 0
+                        ? `${clsStat.highest10.toFixed(2)} / ${clsStat.lowest10.toFixed(2)}`
+                        : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {filteredStudents.length === 0 ? (
             <div className="py-10 text-center text-sm text-[#597169]">
               {students.length === 0
@@ -508,13 +666,24 @@ export function ClassesView({
                     <th className="py-3 pr-4">STT</th>
                     <th className="py-3 pr-4">Họ và tên</th>
                     <th className="py-3 pr-4">Mã HS</th>
+                    <th className="py-3 pr-4">Kết quả làm bài</th>
                     <th className="py-3 pr-4">Phụ huynh</th>
                     <th className="py-3 pr-4">SĐT phụ huynh</th>
                     <th className="py-3 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EDF3F0] text-sm">
-                  {filteredStudents.map((stu, idx) => (
+                  {filteredStudents.map((stu, idx) => {
+                    const examFilteredSubs =
+                      classStatsExamId === 'all'
+                        ? submissions
+                        : submissions.filter((s) => s.examId === classStatsExamId);
+                    const perf = computeStudentPerformanceInClass(
+                      stu,
+                      activeClass,
+                      examFilteredSubs
+                    );
+                    return (
                     <tr key={stu.id} className="hover:bg-[#F8FAF9] transition-colors">
                       <td className="py-3 pr-4 text-[#597169] tabular-nums">{idx + 1}</td>
                       <td className="py-3 pr-4 font-medium text-[#0D221D]">
@@ -522,6 +691,35 @@ export function ClassesView({
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs text-[#4A615A]">
                         {stu.studentCode || '—'}
+                      </td>
+                      <td className="py-3 pr-4 text-xs tabular-nums">
+                        {perf.submissionCount > 0 && perf.avgScore10 !== null ? (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded-md font-semibold border ${
+                                perf.avgScore10 >= 6.5
+                                  ? 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0F4C3F]'
+                                  : perf.avgScore10 >= 5
+                                    ? 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D]'
+                                    : 'bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C]'
+                              }`}
+                            >
+                              TB {perf.avgScore10.toFixed(2)}/10
+                            </span>
+                            <span className="text-[#597169]">({perf.submissionCount} bài)</span>
+                            {onOpenSubmission && perf.latestSubmissionId && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenSubmission(perf.latestSubmissionId!)}
+                                className="text-[#0F4C3F] font-semibold hover:underline cursor-pointer"
+                              >
+                                Xem
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[#8DA29B]">Chưa nộp bài</span>
+                        )}
                       </td>
                       <td className="py-3 pr-4 text-[#3A524A]">
                         {stu.parentName || '—'}
@@ -561,7 +759,8 @@ export function ClassesView({
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -587,18 +786,33 @@ export function ClassesView({
             </div>
 
             <form onSubmit={handleCreateClass} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
-                  Tên lớp *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={className}
-                  onChange={(e) => setClassName(e.target.value)}
-                  placeholder="Ví dụ: 12A3"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
+                    Tên lớp *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={className}
+                    onChange={(e) => setClassName(e.target.value)}
+                    placeholder="Ví dụ: 12A3"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
+                    Mã lớp (tuỳ chọn)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={20}
+                    value={classJoinCode}
+                    onChange={(e) => setClassJoinCode(e.target.value.toUpperCase())}
+                    placeholder="Để trống sẽ tự tạo"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] text-sm font-mono uppercase focus:outline-none focus:border-[#0F4C3F]"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -825,6 +1039,128 @@ export function ClassesView({
                   className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-medium hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer"
                 >
                   {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Class & Join Code */}
+      {editingClass && (
+        <div className="fixed inset-0 z-50 bg-[#082B23]/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-[#DAE5E0] max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-semibold tracking-[0.08em] text-[#8A630D] uppercase">
+                  Thông tin lớp học
+                </div>
+                <h3 className="font-serif text-xl font-semibold text-[#0D221D]">
+                  Chỉnh sửa lớp &amp; mã lớp
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingClass(null)}
+                className="p-1.5 rounded-lg text-[#597169] hover:bg-[#EFF7F3] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveClassEdit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                  Tên lớp *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editClassName}
+                  onChange={(e) => setEditClassName(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                  Mã lớp (3–20 ký tự không dấu) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={20}
+                  value={editClassJoinCode}
+                  onChange={(e) => setEditClassJoinCode(e.target.value.toUpperCase())}
+                  placeholder="VD: LY12A1"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] font-mono text-sm font-semibold uppercase text-[#8A630D] focus:outline-none focus:border-[#0F4C3F]"
+                />
+                <p className="text-[11px] text-[#597169] mt-1">
+                  Mã sau chuẩn hoá:{' '}
+                  <strong className="font-mono text-[#0F4C3F]">
+                    {normalizeJoinCode(editClassJoinCode) || '—'}
+                  </strong>
+                  . Học sinh sẽ vào lớp bằng mã mới này.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                    Môn học
+                  </label>
+                  <input
+                    type="text"
+                    value={editClassSubject}
+                    onChange={(e) => setEditClassSubject(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                    Khối
+                  </label>
+                  <input
+                    type="text"
+                    value={editClassGrade}
+                    onChange={(e) => setEditClassGrade(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                  Năm học
+                </label>
+                <input
+                  type="text"
+                  value={editClassYear}
+                  onChange={(e) => setEditClassYear(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
+                />
+              </div>
+
+              {editClassError && (
+                <div className="p-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#B91C1C]">
+                  {editClassError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingClass(null)}
+                  className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#F8FAF9] cursor-pointer"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingClassEdit}
+                  className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer"
+                >
+                  {savingClassEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
               </div>
             </form>

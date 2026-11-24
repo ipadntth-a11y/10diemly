@@ -1,9 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,7 +26,10 @@ function getGeminiClient(): GoogleGenAI {
   });
 }
 
-const FALLBACK_MODELS = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'] as const;
+const PRIMARY_MODEL = 'gemini-4-hydrogen';
+const BACKUP_MODEL = 'gemini-3.1-flash-lite';
+const HYDROGEN_COOLDOWN_MS = 60_000;
+let hydrogenCooldownUntil = 0;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,7 +46,12 @@ function isTransientAiError(error: unknown): boolean {
     message.includes('500') ||
     message.includes('deadline_exceeded') ||
     message.includes('econnreset') ||
-    message.includes('fetch failed')
+    message.includes('etimedout') ||
+    message.includes('fetch failed') ||
+    message.includes('abort') ||
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('socket')
   );
 }
 
@@ -52,35 +60,58 @@ async function generateContentWithRetry(
   params: {
     contents: unknown;
     config?: Record<string, unknown>;
+    timeoutMs?: number;
   }
 ) {
-  const attempts: { model: string; delayMs: number }[] = [
-    { model: FALLBACK_MODELS[0], delayMs: 0 },
-    { model: FALLBACK_MODELS[0], delayMs: 700 },
-    { model: FALLBACK_MODELS[1], delayMs: 250 },
-    { model: FALLBACK_MODELS[1], delayMs: 1100 },
-  ];
+  const baseTimeout = params.timeoutMs ?? 11_000;
+  const now = Date.now();
+  const preferBackupFirst = now < hydrogenCooldownUntil;
+
+  // Avoid retrying an overloaded primary twice back-to-back before trying backup.
+  const attempts: { model: string; delayMs: number; timeoutMs: number }[] = preferBackupFirst
+    ? [
+        { model: BACKUP_MODEL, delayMs: 0, timeoutMs: baseTimeout + 2000 },
+        { model: BACKUP_MODEL, delayMs: 400, timeoutMs: baseTimeout + 3000 },
+        { model: PRIMARY_MODEL, delayMs: 250, timeoutMs: baseTimeout },
+      ]
+    : [
+        { model: PRIMARY_MODEL, delayMs: 0, timeoutMs: Math.min(baseTimeout, 10_000) },
+        { model: BACKUP_MODEL, delayMs: 150, timeoutMs: baseTimeout + 2000 },
+        { model: BACKUP_MODEL, delayMs: 500, timeoutMs: baseTimeout + 3000 },
+      ];
 
   let lastError: unknown;
   for (const attempt of attempts) {
     if (attempt.delayMs > 0) {
       await sleep(attempt.delayMs);
     }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), attempt.timeoutMs);
     try {
+      const mergedConfig: Record<string, unknown> = {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        ...(params.config ?? {}),
+        abortSignal: controller.signal,
+      };
       return await ai.models.generateContent({
         model: attempt.model,
         contents: params.contents as never,
-        ...(params.config ? { config: params.config as never } : {}),
+        config: mergedConfig as never,
       });
     } catch (err) {
       lastError = err;
+      if (attempt.model === PRIMARY_MODEL && isTransientAiError(err)) {
+        hydrogenCooldownUntil = Date.now() + HYDROGEN_COOLDOWN_MS;
+      }
       if (!isTransientAiError(err)) {
         throw err;
       }
       console.warn(
-        `Gemini transient error on ${attempt.model}, retrying...`,
+        `Gemini transient error on ${attempt.model}, failing over...`,
         err instanceof Error ? err.message : String(err)
       );
+    } finally {
+      clearTimeout(timer);
     }
   }
   throw lastError;
@@ -92,11 +123,24 @@ function parseAiJson<T = Record<string, unknown>>(rawText: string | undefined): 
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim();
-  return JSON.parse(stripped || '{}') as T;
+  if (!stripped) {
+    return {} as T;
+  }
+  try {
+    return JSON.parse(stripped) as T;
+  } catch {
+    const firstBrace = stripped.indexOf('{');
+    const lastBrace = stripped.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      return JSON.parse(stripped.slice(firstBrace, lastBrace + 1)) as T;
+    }
+    throw new Error('Phản hồi từ AI không đúng định dạng JSON hợp lệ.');
+  }
 }
 
 function handleAiError(res: Response, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
   console.error('Gemini API Error:', message);
   if (message.includes('GEMINI_API_KEY')) {
     return res.status(503).json({
@@ -108,9 +152,19 @@ function handleAiError(res: Response, error: unknown) {
       error: 'API key không hợp lệ hoặc thiếu quyền truy cập. Vui lòng kiểm tra Settings > Secrets.',
     });
   }
+  if (
+    lower.includes('abort') ||
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('deadline_exceeded')
+  ) {
+    return res.status(504).json({
+      error: 'Máy chủ AI phản hồi quá lâu do quá tải tạm thời. Vui lòng bấm tải lại sau vài giây.',
+    });
+  }
   if (message.includes('503') || message.includes('UNAVAILABLE') || message.includes('high demand')) {
     return res.status(503).json({
-      error: 'Hệ thống AI đang quá tải tạm thời. Vui lòng bấm Thử tạo lại sau vài giây.',
+      error: 'Hệ thống AI đang quá tải tạm thời. Vui lòng bấm Thử lại sau vài giây.',
     });
   }
   if (message.includes('RESOURCE_EXHAUSTED') || message.includes('429')) {
@@ -287,6 +341,7 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
 
       const response = await generateContentWithRetry(ai, {
         contents: { parts },
+        timeoutMs: 22_000,
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
@@ -365,6 +420,7 @@ app.post('/api/ai/grade-photo', async (req: Request, res: Response) => {
     const maxS = Math.min(Math.max(Number(maxScore || 10), 0.25), 100);
 
     const response = await generateContentWithRetry(ai, {
+      timeoutMs: 22_000,
       contents: {
         parts: [
           {
@@ -483,6 +539,7 @@ Quy tắc công thức Toán/Vật lí/Hoá học: Tất cả biểu thức, ph�
 
     const response = await generateContentWithRetry(ai, {
       contents: prompt,
+      timeoutMs: 22_000,
       config: {
         responseMimeType: 'application/json',
         responseSchema: {
@@ -558,6 +615,7 @@ ${annotatedText.slice(0, 45000)}`;
 
     const response = await generateContentWithRetry(ai, {
       contents: prompt,
+      timeoutMs: 24_000,
       config: {
         responseMimeType: 'application/json',
         responseSchema: {
@@ -689,6 +747,7 @@ ${JSON.stringify(batch, null, 2)}`;
 
       const response = await generateContentWithRetry(ai, {
         contents: prompt,
+        timeoutMs: 22_000,
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
@@ -939,6 +998,25 @@ Hãy trả về JSON với giọng văn thân thiện, khích lệ nhưng thẳn
   } catch (error) {
     return handleAiError(res, error);
   }
+});
+
+// Ensure /api/* routes always return JSON even on 404 or body-parser/express errors
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Không tìm thấy API endpoint yêu cầu.' });
+});
+
+app.use('/api', (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const status =
+    typeof (err as { status?: number })?.status === 'number'
+      ? (err as { status: number }).status
+      : 500;
+  const message =
+    status === 413
+      ? 'Dữ liệu gửi lên vượt quá giới hạn 8MB. Vui lòng giảm kích thước ảnh hoặc tệp.'
+      : err instanceof Error
+        ? err.message
+        : 'Lỗi máy chủ khi xử lý yêu cầu API.';
+  res.status(status).json({ error: message });
 });
 
 async function startServer() {

@@ -74,7 +74,7 @@ service cloud.firestore {
 
     function isValidExam(data) {
       return data.keys().hasAll(['id', 'teacherId', 'title', 'subject', 'examCode', 'durationMinutes', 'isPublished', 'questionCount', 'questions', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'teacherId', 'title', 'subject', 'examCode', 'durationMinutes', 'isPublished', 'questionCount', 'questions', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'teacherId', 'title', 'subject', 'examCode', 'durationMinutes', 'isPublished', 'questionCount', 'questions', 'assignedClassIds', 'assignedClassNames', 'createdAt', 'updatedAt'])
         && isValidId(data.id)
         && isValidId(data.teacherId)
         && data.teacherId == request.auth.uid
@@ -86,6 +86,8 @@ service cloud.firestore {
         && data.questionCount is int && data.questionCount >= 1 && data.questionCount <= 100
         && data.questions is list && data.questions.size() >= 1 && data.questions.size() <= 100
         && data.questions[0] is map
+        && (!('assignedClassIds' in data) || (data.assignedClassIds is list && data.assignedClassIds.size() <= 100 && (data.assignedClassIds.size() == 0 || data.assignedClassIds[0] is string)))
+        && (!('assignedClassNames' in data) || (data.assignedClassNames is list && data.assignedClassNames.size() <= 100 && (data.assignedClassNames.size() == 0 || data.assignedClassNames[0] is string)))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -293,7 +295,7 @@ service cloud.firestore {
         && incoming().teacherId == existing().teacherId
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'subject', 'examCode', 'durationMinutes', 'isPublished', 'questionCount', 'questions', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'subject', 'examCode', 'durationMinutes', 'isPublished', 'questionCount', 'questions', 'assignedClassIds', 'assignedClassNames', 'updatedAt']);
       allow delete: if isVerified() && isValidId(examId) && existing().teacherId == request.auth.uid;
     }
 

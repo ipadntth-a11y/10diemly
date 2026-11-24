@@ -12,7 +12,9 @@ import {
   extractFriendlyFirestoreError,
 } from '../services/firestoreService';
 import type { Classroom, Exam, Submission } from '../types';
+import { resolveClassForSubmission } from '../utils/classStats';
 import { formatDurationMMSS, formatScore } from '../utils/formatters';
+import { ClassStatsSection } from './ClassStatsSection';
 
 interface OverviewViewProps {
   teacherId: string;
@@ -40,6 +42,8 @@ export function OverviewView({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [statsExamId, setStatsExamId] = useState<string>('all');
+  const [statsClassFilter, setStatsClassFilter] = useState<string>('all');
 
   const avgPercent =
     submissions.length > 0
@@ -53,7 +57,18 @@ export function OverviewView({
         )
       : 0;
 
-  const recentSubmissions = submissions.slice(0, 8);
+  const filteredRecentSource = submissions.filter((sub) => {
+    if (statsExamId !== 'all' && sub.examId !== statsExamId) return false;
+    if (statsClassFilter !== 'all') {
+      const resolved = resolveClassForSubmission(sub, classes);
+      const subClassLabel = (resolved?.name || sub.className || 'Chưa ghi lớp').trim();
+      if (subClassLabel.toLowerCase() !== statsClassFilter.trim().toLowerCase()) {
+        return false;
+      }
+    }
+    return true;
+  });
+  const recentSubmissions = filteredRecentSource.slice(0, 8);
   const firstExam = exams[0];
 
   const handleConfirmDelete = async (subId: string) => {
@@ -135,14 +150,44 @@ export function OverviewView({
         </div>
       </div>
 
+      {/* Class-by-class Score Statistics */}
+      <ClassStatsSection
+        classes={classes}
+        submissions={submissions}
+        exams={exams}
+        selectedExamId={statsExamId}
+        onChangeExamId={(id) => {
+          setStatsExamId(id);
+          setStatsClassFilter('all');
+        }}
+        activeClassFilter={statsClassFilter}
+        onSelectClassFilter={setStatsClassFilter}
+        exportPrefix={
+          statsExamId !== 'all'
+            ? exams.find((e) => e.id === statsExamId)?.examCode || 'de_thi'
+            : 'tong_hop'
+        }
+      />
+
       {/* Main 2-column content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Recent submissions */}
         <section className="lg:col-span-8 bg-white border border-[#DAE5E0] rounded-2xl p-6">
-          <div className="flex items-center justify-between gap-4 pb-4 border-b border-[#EBF1EE]">
-            <h2 className="font-serif text-lg font-semibold text-[#0D221D]">
-              Bài nộp gần đây
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#EBF1EE]">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-serif text-lg font-semibold text-[#0D221D]">
+                Bài nộp gần đây
+              </h2>
+              {statsClassFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setStatsClassFilter('all')}
+                  className="px-2.5 py-0.5 rounded-lg bg-[#EFF7F3] border border-[#C5DDD3] text-xs font-semibold text-[#0F4C3F] hover:bg-[#E2EFE8] cursor-pointer"
+                >
+                  Lớp {statsClassFilter} ×
+                </button>
+              )}
+            </div>
             {firstExam && (
               <button
                 type="button"

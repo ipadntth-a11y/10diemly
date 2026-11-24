@@ -85,6 +85,14 @@ export function normalizeJoinCode(val: string | undefined | null): string {
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9_-]/g, '')
+    .slice(0, 20);
+}
+
+export function normalizeExamCode(val: string | undefined | null): string {
+  return stripVietnameseAccents(val ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '')
     .slice(0, 30);
 }
 
@@ -594,20 +602,48 @@ export function subscribeClassStudents(
 
 export async function createClassroom(
   teacherId: string,
-  input: { name: string; subject: string; grade: string; academicYear: string }
+  input: {
+    name: string;
+    subject: string;
+    grade: string;
+    academicYear: string;
+    joinCode?: string;
+  }
 ): Promise<string> {
   if (!teacherId) {
     throw new Error('Không xác định được tài khoản giáo viên.');
   }
   const id = makeSafeId('cls');
-  const randSuffix = Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, 'X');
-  const namePrefix = stripVietnameseAccents(input.name)
-    .replace(/\s+/g, '')
-    .replace(/[^a-zA-Z0-9_-]/g, '')
-    .toUpperCase()
-    .slice(0, 14);
-  const rawJoin = namePrefix ? `${namePrefix}_${randSuffix}` : `CLS_${randSuffix}`;
-  const joinCode = safeCode(rawJoin, `CLS_${randSuffix}`, 20);
+  let joinCode = '';
+  if (input.joinCode && input.joinCode.trim().length > 0) {
+    const normalized = normalizeJoinCode(input.joinCode);
+    if (normalized.length < 3 || normalized.length > 20 || !/^[A-Z0-9_-]{3,20}$/.test(normalized)) {
+      throw new Error(
+        'Mã lớp phải dài từ 3 đến 20 ký tự, chỉ gồm chữ cái không dấu, số, dấu gạch dưới (_) hoặc gạch ngang (-).'
+      );
+    }
+    try {
+      const existingRoster = await getDoc(doc(db, 'classRosters', normalized));
+      if (existingRoster.exists()) {
+        throw new Error(`Mã lớp "${normalized}" đã tồn tại. Vui lòng chọn mã lớp khác.`);
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('đã tồn tại')) {
+        throw err;
+      }
+    }
+    joinCode = normalized;
+  } else {
+    const randSuffix = Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, 'X');
+    const namePrefix = stripVietnameseAccents(input.name)
+      .replace(/\s+/g, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '')
+      .toUpperCase()
+      .slice(0, 14);
+    const rawJoin = namePrefix ? `${namePrefix}_${randSuffix}` : `CLS_${randSuffix}`;
+    joinCode = safeCode(rawJoin, `CLS_${randSuffix}`, 20);
+  }
+
   const path = `classes/${id}`;
   const newClass: Classroom = {
     id,
@@ -629,6 +665,170 @@ export async function createClassroom(
     return id;
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, path);
+  }
+}
+
+export async function updateClassroom(
+  classId: string,
+  teacherId: string,
+  patch: {
+    name?: string;
+    subject?: string;
+    grade?: string;
+    academicYear?: string;
+    joinCode?: string;
+  }
+): Promise<void> {
+  const path = `classes/${classId}`;
+  const clsSnap = await getDoc(doc(db, 'classes', classId));
+  if (!clsSnap.exists()) {
+    throw new Error('Không tìm thấy lớp học cần chỉnh sửa.');
+  }
+  const existingCls = clsSnap.data() as Classroom;
+  if (existingCls.teacherId !== teacherId) {
+    throw new Error('Bạn không có quyền chỉnh sửa lớp học này.');
+  }
+
+  const oldJoinCode = normalizeJoinCode(existingCls.joinCode);
+  let nextJoinCode = oldJoinCode;
+  if (patch.joinCode !== undefined) {
+    nextJoinCode = normalizeJoinCode(patch.joinCode);
+    if (
+      nextJoinCode.length < 3 ||
+      nextJoinCode.length > 20 ||
+      !/^[A-Z0-9_-]{3,20}$/.test(nextJoinCode)
+    ) {
+      throw new Error(
+        'Mã lớp phải dài từ 3 đến 20 ký tự, chỉ gồm chữ cái không dấu, số, dấu gạch dưới (_) hoặc gạch ngang (-).'
+      );
+    }
+    if (nextJoinCode !== oldJoinCode) {
+      try {
+        const collisionSnap = await getDoc(doc(db, 'classRosters', nextJoinCode));
+        if (collisionSnap.exists()) {
+          const collisionData = collisionSnap.data() as ClassRoster;
+          if (collisionData.classId !== classId) {
+            throw new Error(
+              `Mã lớp "${nextJoinCode}" đang được dùng cho lớp ${collisionData.className || 'khác'}. Vui lòng chọn mã lớp khác.`
+            );
+          }
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('đang được dùng')) {
+          throw err;
+        }
+      }
+    }
+  }
+
+  const nextName =
+    patch.name !== undefined
+      ? clampStr(patch.name, 100) || existingCls.name
+      : existingCls.name;
+  const nextSubject =
+    patch.subject !== undefined
+      ? clampStr(patch.subject, 80) || existingCls.subject
+      : existingCls.subject;
+  const nextGrade =
+    patch.grade !== undefined ? clampStr(patch.grade, 30) : existingCls.grade;
+  const nextAcademicYear =
+    patch.academicYear !== undefined
+      ? clampStr(patch.academicYear, 30) || existingCls.academicYear
+      : existingCls.academicYear;
+
+  try {
+    await updateDoc(doc(db, 'classes', classId), {
+      name: nextName,
+      subject: nextSubject,
+      grade: nextGrade,
+      academicYear: nextAcademicYear,
+      joinCode: nextJoinCode,
+      updatedAt: serverTimestamp(),
+    });
+
+    const updatedCls: Classroom = {
+      ...existingCls,
+      name: nextName,
+      subject: nextSubject,
+      grade: nextGrade,
+      academicYear: nextAcademicYear,
+      joinCode: nextJoinCode,
+    };
+
+    const stuSnap = await getDocs(
+      query(collection(db, 'classes', classId, 'students'), where('teacherId', '==', teacherId))
+    );
+    const students = stuSnap.docs.map((d) => d.data() as StudentRecord);
+
+    if (nextJoinCode !== oldJoinCode) {
+      await syncSingleClassRoster(updatedCls, students);
+      if (oldJoinCode.length >= 3) {
+        try {
+          await deleteDoc(doc(db, 'classRosters', oldJoinCode));
+        } catch {
+          // Ignore if old roster did not exist
+        }
+      }
+    } else {
+      await syncSingleClassRoster(updatedCls, students);
+    }
+
+    if (nextName !== existingCls.name) {
+      try {
+        const codesSnap = await getDocs(
+          query(
+            collection(db, 'studentCodes'),
+            where('teacherId', '==', teacherId),
+            where('classId', '==', classId)
+          )
+        );
+        if (!codesSnap.empty) {
+          const codeBatch = writeBatch(db);
+          codesSnap.docs.forEach((d) => {
+            codeBatch.update(d.ref, {
+              className: nextName,
+              updatedAt: serverTimestamp(),
+            });
+          });
+          await codeBatch.commit();
+        }
+      } catch (syncErr) {
+        console.warn('Could not update className in studentCodes:', syncErr);
+      }
+
+      try {
+        const examsSnap = await getDocs(
+          query(collection(db, 'exams'), where('teacherId', '==', teacherId))
+        );
+        const affectedExams = examsSnap.docs.filter((d) => {
+          const ex = d.data() as Exam;
+          return Array.isArray(ex.assignedClassIds) && ex.assignedClassIds.includes(classId);
+        });
+        if (affectedExams.length > 0) {
+          const clsSnapAll = await getDocs(
+            query(collection(db, 'classes'), where('teacherId', '==', teacherId))
+          );
+          const classNameById = new Map<string, string>(
+            clsSnapAll.docs.map((d) => [d.id, (d.data() as Classroom).name])
+          );
+          classNameById.set(classId, nextName);
+          const examBatch = writeBatch(db);
+          affectedExams.forEach((d) => {
+            const ex = d.data() as Exam;
+            const ids = ex.assignedClassIds || [];
+            examBatch.update(d.ref, {
+              assignedClassNames: ids.map((id) => clampStr(classNameById.get(id) || id, 100)),
+              updatedAt: serverTimestamp(),
+            });
+          });
+          await examBatch.commit();
+        }
+      } catch (examSyncErr) {
+        console.warn('Could not update assignedClassNames in exams:', examSyncErr);
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, path);
   }
 }
 
@@ -920,18 +1120,44 @@ export async function createExam(
   input: {
     title: string;
     subject: string;
+    examCode?: string;
     durationMinutes: number;
     isPublished: boolean;
     questions: ExamQuestion[];
+    assignedClassIds?: string[];
+    assignedClassNames?: string[];
   }
 ): Promise<string> {
   const id = makeSafeId('exam');
-  const examCode = safeCode(
-    `D10_${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
-    'D10_EXAM',
-    30
-  );
+  let examCode = '';
+  if (input.examCode && input.examCode.trim().length > 0) {
+    const normalized = normalizeExamCode(input.examCode);
+    if (
+      normalized.length < 3 ||
+      normalized.length > 30 ||
+      !/^[A-Z0-9_-]{3,30}$/.test(normalized)
+    ) {
+      throw new Error(
+        'Mã đề phải dài từ 3 đến 30 ký tự, chỉ gồm chữ cái không dấu, số, dấu gạch dưới (_) hoặc gạch ngang (-).'
+      );
+    }
+    examCode = normalized;
+  } else {
+    examCode = safeCode(
+      `D10_${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      'D10_EXAM',
+      30
+    );
+  }
+
   const questions = sanitizeExamQuestions(input.questions);
+  const cleanClassIds = Array.from(
+    new Set((input.assignedClassIds || []).map((v) => clampStr(v, 128)).filter(Boolean))
+  ).slice(0, 100);
+  const cleanClassNames = (input.assignedClassNames || [])
+    .map((v) => clampStr(v, 100))
+    .filter(Boolean)
+    .slice(0, 100);
 
   try {
     await setDoc(doc(db, 'exams', id), {
@@ -944,6 +1170,8 @@ export async function createExam(
       isPublished: Boolean(input.isPublished),
       questionCount: questions.length,
       questions,
+      assignedClassIds: cleanClassIds,
+      assignedClassNames: cleanClassNames,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -958,31 +1186,60 @@ export async function updateExam(
   patch: {
     title?: string;
     subject?: string;
+    examCode?: string;
     durationMinutes?: number;
-    questions: ExamQuestion[];
+    questions?: ExamQuestion[];
+    assignedClassIds?: string[];
+    assignedClassNames?: string[];
   }
 ): Promise<void> {
-  const questions = sanitizeExamQuestions(patch.questions);
-  if (questions.length === 0) {
-    throw new Error('Đề thi phải có ít nhất 1 câu hỏi.');
-  }
-
   const updatePayload: Record<string, unknown> = {
-    questions,
-    questionCount: questions.length,
     updatedAt: serverTimestamp(),
   };
+
+  if (patch.questions !== undefined) {
+    const questions = sanitizeExamQuestions(patch.questions);
+    if (questions.length === 0) {
+      throw new Error('Đề thi phải có ít nhất 1 câu hỏi.');
+    }
+    updatePayload.questions = questions;
+    updatePayload.questionCount = questions.length;
+  }
+
   if (patch.title !== undefined) {
     updatePayload.title = clampStr(patch.title, 200) || 'Đề kiểm tra';
   }
   if (patch.subject !== undefined) {
     updatePayload.subject = clampStr(patch.subject, 80) || 'Vật lí';
   }
+  if (patch.examCode !== undefined) {
+    const normalizedCode = normalizeExamCode(patch.examCode);
+    if (
+      normalizedCode.length < 3 ||
+      normalizedCode.length > 30 ||
+      !/^[A-Z0-9_-]{3,30}$/.test(normalizedCode)
+    ) {
+      throw new Error(
+        'Mã đề phải dài từ 3 đến 30 ký tự, chỉ gồm chữ cái không dấu, số, dấu gạch dưới (_) hoặc gạch ngang (-).'
+      );
+    }
+    updatePayload.examCode = normalizedCode;
+  }
   if (patch.durationMinutes !== undefined) {
     updatePayload.durationMinutes = Math.min(
       Math.max(Math.round(patch.durationMinutes || 45), 1),
       300
     );
+  }
+  if (patch.assignedClassIds !== undefined) {
+    const cleanIds = Array.from(
+      new Set(patch.assignedClassIds.map((v) => clampStr(v, 128)).filter(Boolean))
+    ).slice(0, 100);
+    updatePayload.assignedClassIds = cleanIds;
+    updatePayload.assignedClassNames = (patch.assignedClassNames || [])
+      .map((v) => clampStr(v, 100))
+      .filter(Boolean)
+      .slice(0, 100);
   }
 
   try {
@@ -1144,6 +1401,7 @@ export async function lookupStudentByCode(
 ): Promise<{
   studentCode: string;
   studentName: string;
+  classId?: string;
   className: string;
   teacherId: string;
 } | null> {
@@ -1163,12 +1421,14 @@ export async function lookupStudentByCode(
         const data = snap.data() as {
           studentCode: string;
           studentName: string;
+          classId?: string;
           className: string;
           teacherId: string;
         };
         return {
           studentCode: data.studentCode,
           studentName: data.studentName,
+          classId: data.classId,
           className: data.className,
           teacherId: data.teacherId,
         };
@@ -1187,6 +1447,7 @@ export async function lookupStudentByCode(
       return {
         studentCode: normalizeStudentCode(hit.studentCode),
         studentName: hit.fullName,
+        classId: cls.idSuffix,
         className: cls.name,
         teacherId: 'sample_teacher',
       };

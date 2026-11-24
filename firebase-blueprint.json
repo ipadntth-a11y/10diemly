@@ -183,6 +183,20 @@
         "questions": {
           "type": "array"
         },
+        "assignedClassIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "assignedClassNames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"

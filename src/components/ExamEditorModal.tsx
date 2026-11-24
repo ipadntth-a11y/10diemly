@@ -13,10 +13,11 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import {
   extractFriendlyFirestoreError,
+  normalizeExamCode,
   regradeExamSubmissions,
   updateExam,
 } from '../services/firestoreService';
-import type { Exam, ExamQuestion, QuestionType, Submission } from '../types';
+import type { Classroom, Exam, ExamQuestion, QuestionType, Submission } from '../types';
 import { compressExamPhoto } from '../utils/imageUtils';
 import { containsLatexFormula, MathText } from './MathText';
 
@@ -24,6 +25,7 @@ type EditorFilter = 'all' | QuestionType;
 
 interface ExamEditorModalProps {
   exam: Exam;
+  classes?: Classroom[];
   examSubmissions?: Submission[];
   initialFilter?: EditorFilter;
   initialQuestionId?: string | null;
@@ -106,6 +108,7 @@ function createDefaultQuestion(type: QuestionType, nextIdx: number): ExamQuestio
 
 export function ExamEditorModal({
   exam,
+  classes = [],
   examSubmissions = [],
   initialFilter = 'all',
   initialQuestionId = null,
@@ -113,7 +116,11 @@ export function ExamEditorModal({
 }: ExamEditorModalProps) {
   const [title, setTitle] = useState(exam.title);
   const [subject, setSubject] = useState(exam.subject);
+  const [examCode, setExamCode] = useState(exam.examCode);
   const [durationMinutes, setDurationMinutes] = useState(exam.durationMinutes);
+  const [assignedClassIds, setAssignedClassIds] = useState<string[]>(() =>
+    Array.isArray(exam.assignedClassIds) ? [...exam.assignedClassIds] : []
+  );
   const [questions, setQuestions] = useState<ExamQuestion[]>(() =>
     exam.questions.map((q) => ({
       ...q,
@@ -280,6 +287,14 @@ export function ExamEditorModal({
     e.preventDefault();
     setError(null);
 
+    const normalizedExamCode = normalizeExamCode(examCode);
+    if (normalizedExamCode.length < 3 || normalizedExamCode.length > 30) {
+      setError(
+        'Mã đề phải dài từ 3 đến 30 ký tự, chỉ gồm chữ không dấu, số, dấu gạch dưới (_) hoặc gạch ngang (-).'
+      );
+      return;
+    }
+
     const emptyIndices = questions
       .map((q, idx) => (!q.prompt.trim() ? idx + 1 : null))
       .filter((v): v is number => v !== null);
@@ -293,12 +308,19 @@ export function ExamEditorModal({
       return;
     }
 
+    const classMap = new Map(classes.map((c) => [c.id, c.name]));
+    const cleanAssignedIds = assignedClassIds.filter((id) => classMap.has(id) || id.length > 0);
+    const cleanAssignedNames = cleanAssignedIds.map((id) => classMap.get(id) || id);
+
     setSaving(true);
     try {
       await updateExam(exam.id, {
         title: title.trim() || exam.title,
         subject: subject.trim() || exam.subject,
+        examCode: normalizedExamCode,
         durationMinutes,
+        assignedClassIds: cleanAssignedIds,
+        assignedClassNames: cleanAssignedNames,
         questions,
       });
       if (regradeExisting && examSubmissions.length > 0) {
@@ -340,9 +362,9 @@ export function ExamEditorModal({
         </div>
 
         <form onSubmit={handleSave} className="flex-1 min-h-0 flex flex-col space-y-3.5">
-          {/* Exam Title, Subject & Duration */}
+          {/* Exam Title, Subject, Exam Code & Duration */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 shrink-0">
-            <div className="sm:col-span-6">
+            <div className="sm:col-span-5">
               <label className="block text-xs font-medium text-[#3A524A] mb-1">
                 Tên đề kiểm tra
               </label>
@@ -353,7 +375,7 @@ export function ExamEditorModal({
                 className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
               />
             </div>
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-3">
               <label className="block text-xs font-medium text-[#3A524A] mb-1">
                 Môn học
               </label>
@@ -372,6 +394,19 @@ export function ExamEditorModal({
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                Mã đề
+              </label>
+              <input
+                type="text"
+                maxLength={30}
+                value={examCode}
+                onChange={(e) => setExamCode(e.target.value.toUpperCase())}
+                placeholder="VD: DE12_01"
+                className="w-full px-3 py-2 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] font-mono text-sm font-semibold uppercase text-[#8A630D] focus:outline-none focus:border-[#0F4C3F]"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-[#3A524A] mb-1">
                 Thời gian (phút)
               </label>
               <input
@@ -383,6 +418,53 @@ export function ExamEditorModal({
                 className="w-full px-3 py-2 rounded-xl border border-[#CEDCD6] text-sm text-[#0D221D] tabular-nums focus:outline-none focus:border-[#0F4C3F]"
               />
             </div>
+          </div>
+
+          {/* Class Assignment Strip */}
+          <div className="p-3 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] flex flex-wrap items-center gap-2 shrink-0">
+            <span className="text-xs font-semibold text-[#3A524A] mr-1">
+              Phân đề cho lớp:
+            </span>
+            <button
+              type="button"
+              onClick={() => setAssignedClassIds([])}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                assignedClassIds.length === 0
+                  ? 'bg-[#0F4C3F] text-white border-[#0F4C3F]'
+                  : 'bg-white text-[#4A615A] border-[#CEDCD6] hover:border-[#0F4C3F]'
+              }`}
+            >
+              Tất cả các lớp
+            </button>
+            {classes.map((cls) => {
+              const checked = assignedClassIds.includes(cls.id);
+              return (
+                <button
+                  key={cls.id}
+                  type="button"
+                  onClick={() => {
+                    setAssignedClassIds((prev) =>
+                      prev.includes(cls.id)
+                        ? prev.filter((id) => id !== cls.id)
+                        : [...prev, cls.id]
+                    );
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                    checked
+                      ? 'bg-[#FDF8EB] text-[#8A630D] border-[#C89B2B] font-semibold'
+                      : 'bg-white text-[#3A524A] border-[#CEDCD6] hover:border-[#0F4C3F]'
+                  }`}
+                >
+                  <span>Lớp {cls.name}</span>
+                  <span className="text-[10px] font-mono opacity-75">({cls.joinCode})</span>
+                </button>
+              );
+            })}
+            {classes.length === 0 && (
+              <span className="text-[11px] text-[#597169]">
+                (Hãy tạo lớp ở mục Lớp &amp; học sinh để giao đề riêng cho từng lớp)
+              </span>
+            )}
           </div>
 
           {/* Filter Tabs + Search + Add Question Toolbar */}

@@ -378,6 +378,9 @@ function AppShell() {
             <ClassesView
               teacherId={user.uid}
               classes={classes}
+              submissions={submissions}
+              exams={exams}
+              onOpenSubmission={handleOpenSubmission}
               openCreateModalSignal={openClassModalSignal}
               onConsumeCreateSignal={() => setOpenClassModalSignal(0)}
             />
@@ -395,6 +398,7 @@ function AppShell() {
             ) : (
               <ExamsView
                 teacherId={user.uid}
+                classes={classes}
                 exams={exams}
                 submissions={submissions}
                 selectedExamId={selectedExamId}

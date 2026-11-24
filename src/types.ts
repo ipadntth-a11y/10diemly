@@ -55,6 +55,8 @@ export interface Exam {
   isPublished: boolean;
   questionCount: number;
   questions: ExamQuestion[];
+  assignedClassIds?: string[];
+  assignedClassNames?: string[];
   createdAt?: unknown;
   updatedAt?: unknown;
 }

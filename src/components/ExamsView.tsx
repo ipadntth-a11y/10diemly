@@ -27,22 +27,31 @@ import {
   deleteSubmission,
   deleteSubmissionsBulk,
   extractFriendlyFirestoreError,
+  normalizeExamCode,
   toggleExamPublish,
+  updateExam,
 } from '../services/firestoreService';
-import type { Exam, ExamQuestion, QuestionType, Submission } from '../types';
+import type { Classroom, Exam, ExamQuestion, QuestionType, Submission } from '../types';
+import {
+  getSubmissionScore10,
+  resolveClassForSubmission,
+} from '../utils/classStats';
 import {
   parseDocxExam,
   type DocxParseResult,
   type ParsedDocxQuestion,
 } from '../utils/docxParser';
+import { resolveAssignedClassLabels } from '../utils/examAssignment';
 import { formatDurationMMSS, formatScore } from '../utils/formatters';
 import { compressExamPhoto } from '../utils/imageUtils';
+import { ClassStatsSection } from './ClassStatsSection';
 import { ExamEditorModal } from './ExamEditorModal';
 import { containsLatexFormula, MathText } from './MathText';
 import { PhotoEssayGraderModal } from './PhotoEssayGraderModal';
 
 interface ExamsViewProps {
   teacherId: string;
+  classes?: Classroom[];
   exams: Exam[];
   submissions: Submission[];
   selectedExamId: string | null;
@@ -55,6 +64,7 @@ const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 
 export function ExamsView({
   teacherId,
+  classes = [],
   exams,
   submissions,
   selectedExamId,
@@ -70,12 +80,21 @@ export function ExamsView({
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
 
+  // Quick Edit Exam Code & Class Assignment Modal
+  const [assigningExam, setAssigningExam] = useState<Exam | null>(null);
+  const [assignExamCode, setAssignExamCode] = useState('');
+  const [assignClassIds, setAssignClassIds] = useState<string[]>([]);
+  const [savingAssignment, setSavingAssignment] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+
   // Create Exam Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createMode, setCreateMode] = useState<'word' | 'ai' | 'template'>('word');
   const [newTitle, setNewTitle] = useState('');
   const [newSubject, setNewSubject] = useState('Vật lí');
+  const [newExamCode, setNewExamCode] = useState('');
   const [newDuration, setNewDuration] = useState(45);
+  const [newAssignedClassIds, setNewAssignedClassIds] = useState<string[]>([]);
   const [aiTopic, setAiTopic] = useState('Nhiệt học và Khí lí tưởng — Vật lí 12');
   const [aiMcqCount, setAiMcqCount] = useState(4);
   const [aiTfCount, setAiTfCount] = useState(1);
@@ -112,6 +131,7 @@ export function ExamsView({
 
   useEffect(() => {
     setInspectedQuestionId(null);
+    setClassFilter('all');
     setSelectedSubIds(new Set());
     setConfirmBulkDelete(false);
     setConfirmDeleteSubId(null);
@@ -124,6 +144,44 @@ export function ExamsView({
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 1800);
+  };
+
+  const openQuickAssignModal = (exam: Exam) => {
+    setAssignmentError(null);
+    setAssigningExam(exam);
+    setAssignExamCode(exam.examCode);
+    setAssignClassIds(Array.isArray(exam.assignedClassIds) ? [...exam.assignedClassIds] : []);
+  };
+
+  const handleSaveQuickAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assigningExam) return;
+    const normalized = normalizeExamCode(assignExamCode);
+    if (normalized.length < 3 || normalized.length > 30) {
+      setAssignmentError(
+        'Mã đề phải dài từ 3 đến 30 ký tự, chỉ gồm chữ không dấu, số, dấu gạch dưới (_) hoặc gạch ngang (-).'
+      );
+      return;
+    }
+
+    const classMap = new Map(classes.map((c) => [c.id, c.name]));
+    const cleanIds = assignClassIds.filter((id) => classMap.has(id) || id.length > 0);
+    const cleanNames = cleanIds.map((id) => classMap.get(id) || id);
+
+    setSavingAssignment(true);
+    setAssignmentError(null);
+    try {
+      await updateExam(assigningExam.id, {
+        examCode: normalized,
+        assignedClassIds: cleanIds,
+        assignedClassNames: cleanNames,
+      });
+      setAssigningExam(null);
+    } catch (err) {
+      setAssignmentError(extractFriendlyFirestoreError(err));
+    } finally {
+      setSavingAssignment(false);
+    }
   };
 
   const handleGenerateWordExplanations = async (
@@ -471,6 +529,10 @@ export function ExamsView({
       return;
     }
 
+    const classMap = new Map(classes.map((c) => [c.id, c.name]));
+    const cleanClassIds = newAssignedClassIds.filter((id) => classMap.has(id) || id.length > 0);
+    const cleanClassNames = cleanClassIds.map((id) => classMap.get(id) || id);
+
     setGenerating(true);
     try {
       const id = await createExam(teacherId, {
@@ -480,9 +542,12 @@ export function ExamsView({
             ? 'Đề ôn tập mẫu — Vật lí 12'
             : `Đề kiểm tra ${newSubject}`),
         subject: newSubject.trim() || 'Vật lí',
+        ...(newExamCode.trim() ? { examCode: newExamCode.trim() } : {}),
         durationMinutes: newDuration,
         isPublished: true,
         questions: questionsToUse,
+        assignedClassIds: cleanClassIds,
+        assignedClassNames: cleanClassNames,
       });
       setShowCreateModal(false);
       setPreviewQuestions(null);
@@ -490,6 +555,8 @@ export function ExamsView({
       setWordQuestions([]);
       setWordFileName('');
       setNewTitle('');
+      setNewExamCode('');
+      setNewAssignedClassIds([]);
       onSelectExam(id);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Không thể lưu đề.');
@@ -500,12 +567,30 @@ export function ExamsView({
 
   // ---------------- EXAM ANALYTICS VIEW (Screenshot 2 + Deep Question/Timing Drilldown) ----------------
   if (activeExam) {
-    const examSubs = submissions.filter((s) => s.examId === activeExam.id);
+    const allExamSubs = submissions.filter((s) => s.examId === activeExam.id);
+    const getSubClassLabel = (s: Submission) => {
+      const resolved = resolveClassForSubmission(s, classes);
+      return (resolved?.name || s.className || 'Chưa ghi lớp').trim();
+    };
+    const examSubs =
+      classFilter === 'all'
+        ? allExamSubs
+        : allExamSubs.filter(
+            (s) => getSubClassLabel(s).toLowerCase() === classFilter.trim().toLowerCase()
+          );
     const totalSubs = examSubs.length;
-    const avgScore =
+    const avgScore10 =
+      totalSubs > 0
+        ? examSubs.reduce((sum, s) => sum + getSubmissionScore10(s), 0) / totalSubs
+        : 0;
+    const avgRawScore =
       totalSubs > 0
         ? examSubs.reduce((sum, s) => sum + s.totalScore, 0) / totalSubs
         : 0;
+    const avgRawMax =
+      totalSubs > 0
+        ? examSubs.reduce((sum, s) => sum + s.maxScore, 0) / totalSubs
+        : 10;
     const passCount = examSubs.filter(
       (s) => s.maxScore > 0 && s.totalScore / s.maxScore >= 0.5
     ).length;
@@ -669,10 +754,9 @@ export function ExamsView({
       questionStats.find((qs) => qs.question.id === inspectedQuestionId) || null;
 
     const classOptions = Array.from(
-      new Set(examSubs.map((s) => s.className).filter(Boolean))
+      new Set(allExamSubs.map((s) => getSubClassLabel(s)).filter(Boolean))
     );
     const filteredSubs = examSubs.filter((s) => {
-      if (classFilter !== 'all' && s.className !== classFilter) return false;
       const q = searchSub.trim().toLowerCase();
       if (!q) return true;
       return s.studentName.toLowerCase().includes(q);
@@ -782,6 +866,15 @@ export function ExamsView({
 
             <button
               type="button"
+              onClick={() => openQuickAssignModal(activeExam)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] text-xs font-semibold text-[#8A630D] hover:bg-[#FAF1D6] whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-[#B0831A]" />
+              <span>Mã đề &amp; Giao lớp</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => handleCopyCode(activeExam.examCode)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#CEDCD6] bg-white text-xs font-mono text-[#0D221D] hover:bg-[#EFF7F3] whitespace-nowrap shrink-0 cursor-pointer"
             >
@@ -810,22 +903,63 @@ export function ExamsView({
         </div>
 
         {/* Title & metadata */}
-        <div>
-          <div className="text-[11px] font-semibold tracking-[0.12em] text-[#8A630D] uppercase">
-            Phân tích kết quả bài thi
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-semibold tracking-[0.12em] text-[#8A630D] uppercase">
+              Phân tích kết quả bài thi
+            </div>
+            <h1 className="font-serif text-3xl font-semibold text-[#0D221D] mt-1">
+              {activeExam.title}
+            </h1>
+            <div className="text-sm text-[#4A615A] mt-1.5 flex flex-wrap items-center gap-2 tabular-nums">
+              <span>{activeExam.subject}</span>
+              <span aria-hidden="true">·</span>
+              <span>{activeExam.questionCount} câu</span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {classFilter === 'all'
+                  ? `${allExamSubs.length} bài đã nộp`
+                  : `${totalSubs}/${allExamSubs.length} bài (Lớp ${classFilter})`}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>{activeExam.durationMinutes} phút</span>
+              <span aria-hidden="true">·</span>
+              <span className="font-medium text-[#0F4C3F]">
+                Giao cho:{' '}
+                {(() => {
+                  const labels = resolveAssignedClassLabels(activeExam, classes);
+                  return labels.length > 0 ? `Lớp ${labels.join(', ')}` : 'Tất cả các lớp';
+                })()}
+              </span>
+            </div>
           </div>
-          <h1 className="font-serif text-3xl font-semibold text-[#0D221D] mt-1">
-            {activeExam.title}
-          </h1>
-          <div className="text-sm text-[#4A615A] mt-1.5 flex flex-wrap items-center gap-2 tabular-nums">
-            <span>{activeExam.subject}</span>
-            <span aria-hidden="true">·</span>
-            <span>{activeExam.questionCount} câu</span>
-            <span aria-hidden="true">·</span>
-            <span>{totalSubs} bài đã nộp</span>
-            <span aria-hidden="true">·</span>
-            <span>{activeExam.durationMinutes} phút</span>
-          </div>
+
+          {classOptions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <label className="text-xs font-medium text-[#597169]">Xem theo lớp:</label>
+              <select
+                value={classFilter}
+                onChange={(e) => setClassFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs font-semibold text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
+              >
+                <option value="all">Tất cả các lớp ({allExamSubs.length} bài)</option>
+                {classOptions.map((c) => (
+                  <option key={c} value={c}>
+                    Lớp {c}
+                  </option>
+                ))}
+              </select>
+              {classFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setClassFilter('all')}
+                  className="px-2.5 py-2 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] text-xs font-semibold text-[#8A630D] hover:bg-[#F9EED2] cursor-pointer"
+                >
+                  Bỏ lọc lớp
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 4 KPI cards */}
@@ -837,7 +971,11 @@ export function ExamsView({
             <div className="font-serif text-3xl font-semibold text-[#0D221D] tabular-nums">
               {totalSubs}
             </div>
-            <div className="text-xs text-[#597169]">Dữ liệu thực tế đang ghi nhận</div>
+            <div className="text-xs text-[#597169]">
+              {classFilter === 'all'
+                ? 'Dữ liệu thực tế đang ghi nhận'
+                : `Đang lọc riêng Lớp ${classFilter}`}
+            </div>
           </div>
 
           <div className="bg-gradient-to-br from-[#FFFFFF] via-[#FFFFFF] to-[#FDF8EB] border border-[#EAD8A6] rounded-2xl p-5 space-y-2 shadow-[0_1px_2px_rgba(200,155,43,0.08)]">
@@ -845,9 +983,13 @@ export function ExamsView({
               Điểm trung bình
             </div>
             <div className="font-serif text-3xl font-semibold text-[#0A362C] tabular-nums">
-              {totalSubs > 0 ? avgScore.toFixed(2) : '0'}/10
+              {totalSubs > 0 ? avgScore10.toFixed(2) : '0'}/10
             </div>
-            <div className="text-xs text-[#7A580B]">Thang 10 điểm</div>
+            <div className="text-xs text-[#7A580B] tabular-nums">
+              {totalSubs > 0 && Math.abs(avgRawMax - 10) > 0.01
+                ? `Điểm gốc TB: ${formatScore(avgRawScore)}/${formatScore(avgRawMax)}`
+                : 'Quy đổi thang 10 điểm'}
+            </div>
           </div>
 
           <div className="bg-white border border-[#DAE5E0] rounded-2xl p-5 space-y-2 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
@@ -874,6 +1016,17 @@ export function ExamsView({
             </div>
           </div>
         </div>
+
+        {/* Class-by-class Score Breakdown for this Exam */}
+        <ClassStatsSection
+          title={`Thống kê điểm theo từng lớp — ${activeExam.title}`}
+          subtitle="Bấm «Lọc lớp» ở bất kỳ lớp nào để cập nhật toàn bộ biểu đồ, tỉ lệ từng câu và danh sách bài nộp bên dưới."
+          classes={classes}
+          submissions={allExamSubs}
+          activeClassFilter={classFilter}
+          onSelectClassFilter={setClassFilter}
+          exportPrefix={activeExam.examCode}
+        />
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1481,6 +1634,7 @@ export function ExamsView({
         {editingExam && (
           <ExamEditorModal
             exam={editingExam}
+            classes={classes}
             examSubmissions={examSubs}
             initialFilter="all"
             initialQuestionId={editingQuestionId}
@@ -1608,6 +1762,14 @@ export function ExamsView({
                     <span>{subCount} bài đã nộp</span>
                     <span aria-hidden="true">·</span>
                     <span className="font-semibold text-[#8A630D]">ĐTB: {avg}/10</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="font-medium text-[#0F4C3F]">
+                      Giao cho:{' '}
+                      {(() => {
+                        const labels = resolveAssignedClassLabels(exam, classes);
+                        return labels.length > 0 ? `Lớp ${labels.join(', ')}` : 'Tất cả các lớp';
+                      })()}
+                    </span>
                   </div>
                 </div>
 
@@ -1628,6 +1790,16 @@ export function ExamsView({
                         <span>{exam.examCode}</span>
                       </>
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openQuickAssignModal(exam)}
+                    title="Chỉnh sửa mã đề và chọn lớp được giao làm bài"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-[#0D221D] text-xs font-semibold hover:border-[#0F4C3F] hover:bg-[#EFF7F3] transition-colors whitespace-nowrap cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-[#8A630D]" />
+                    <span>Mã đề &amp; Giao lớp</span>
                   </button>
 
                   <button
@@ -1734,8 +1906,8 @@ export function ExamsView({
             </div>
 
             <form onSubmit={handleSaveNewExam} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-6">
                   <label className="block text-xs font-medium text-[#3A524A] mb-1">
                     Tên đề kiểm tra
                   </label>
@@ -1751,7 +1923,20 @@ export function ExamsView({
                     className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
-                <div>
+                <div className="sm:col-span-4">
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                    Mã đề (tuỳ chọn)
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={30}
+                    value={newExamCode}
+                    onChange={(e) => setNewExamCode(e.target.value.toUpperCase())}
+                    placeholder="Để trống tự tạo"
+                    className="w-full px-3.5 py-2 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] font-mono text-sm font-semibold uppercase text-[#8A630D] focus:outline-none focus:border-[#0F4C3F]"
+                  />
+                </div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-[#3A524A] mb-1">
                     Thời gian (phút)
                   </label>
@@ -1764,6 +1949,48 @@ export function ExamsView({
                     className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm tabular-nums focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
+              </div>
+
+              {/* Class assignment picker during exam creation */}
+              <div className="p-3 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-[#3A524A] mr-1">
+                  Phân đề cho lớp:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setNewAssignedClassIds([])}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                    newAssignedClassIds.length === 0
+                      ? 'bg-[#0F4C3F] text-white border-[#0F4C3F]'
+                      : 'bg-white text-[#4A615A] border-[#CEDCD6] hover:border-[#0F4C3F]'
+                  }`}
+                >
+                  Tất cả các lớp
+                </button>
+                {classes.map((cls) => {
+                  const active = newAssignedClassIds.includes(cls.id);
+                  return (
+                    <button
+                      key={cls.id}
+                      type="button"
+                      onClick={() =>
+                        setNewAssignedClassIds((prev) =>
+                          prev.includes(cls.id)
+                            ? prev.filter((id) => id !== cls.id)
+                            : [...prev, cls.id]
+                        )
+                      }
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                        active
+                          ? 'bg-[#FDF8EB] text-[#8A630D] border-[#C89B2B] font-semibold'
+                          : 'bg-white text-[#3A524A] border-[#CEDCD6] hover:border-[#0F4C3F]'
+                      }`}
+                    >
+                      <span>Lớp {cls.name}</span>
+                      <span className="text-[10px] font-mono opacity-75">({cls.joinCode})</span>
+                    </button>
+                  );
+                })}
               </div>
 
               {createMode === 'word' && (
@@ -2583,6 +2810,7 @@ export function ExamsView({
       {editingExam && (
         <ExamEditorModal
           exam={editingExam}
+          classes={classes}
           examSubmissions={submissions.filter((s) => s.examId === editingExam.id)}
           initialFilter="all"
           initialQuestionId={editingQuestionId}
@@ -2591,6 +2819,138 @@ export function ExamsView({
             setEditingQuestionId(null);
           }}
         />
+      )}
+
+      {/* Quick Modal: Edit Exam Code & Assign Classes */}
+      {assigningExam && (
+        <div className="fixed inset-0 z-50 bg-[#082B23]/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-[#DAE5E0] max-w-lg w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold tracking-[0.08em] text-[#8A630D] uppercase">
+                  Cấu hình đề thi
+                </div>
+                <h3 className="font-serif text-xl font-semibold text-[#0D221D] mt-0.5">
+                  Chỉnh mã đề &amp; phân đề cho lớp
+                </h3>
+                <p className="text-xs text-[#597169] mt-0.5 truncate max-w-sm">
+                  {assigningExam.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssigningExam(null)}
+                className="p-1.5 rounded-lg text-[#597169] hover:bg-[#EFF7F3] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickAssignment} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                  Mã đề (3–30 ký tự không dấu) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={30}
+                  value={assignExamCode}
+                  onChange={(e) => setAssignExamCode(e.target.value.toUpperCase())}
+                  placeholder="VD: DE_CK1_VL12"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] font-mono text-sm font-semibold uppercase text-[#8A630D] focus:outline-none focus:border-[#0F4C3F]"
+                />
+                <p className="text-[11px] text-[#597169] mt-1">
+                  Mã chuẩn hoá:{' '}
+                  <strong className="font-mono text-[#0F4C3F]">
+                    {normalizeExamCode(assignExamCode) || '—'}
+                  </strong>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-[#3A524A]">
+                  Chọn lớp được giao đề này:
+                </label>
+                <div className="p-3.5 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setAssignClassIds([])}
+                    className={`w-full text-left px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-between cursor-pointer ${
+                      assignClassIds.length === 0
+                        ? 'bg-[#0F4C3F] text-white border-[#0F4C3F]'
+                        : 'bg-white text-[#3A524A] border-[#CEDCD6] hover:border-[#0F4C3F]'
+                    }`}
+                  >
+                    <span>Tất cả các lớp (mặc định — không giới hạn lớp)</span>
+                    {assignClassIds.length === 0 && <Check className="w-3.5 h-3.5 text-[#E5C665]" />}
+                  </button>
+
+                  {classes.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-0.5">
+                      {classes.map((cls) => {
+                        const checked = assignClassIds.includes(cls.id);
+                        return (
+                          <button
+                            key={cls.id}
+                            type="button"
+                            onClick={() =>
+                              setAssignClassIds((prev) =>
+                                prev.includes(cls.id)
+                                  ? prev.filter((id) => id !== cls.id)
+                                  : [...prev, cls.id]
+                              )
+                            }
+                            className={`px-3 py-2 rounded-xl border text-left text-xs flex items-center justify-between gap-2 cursor-pointer ${
+                              checked
+                                ? 'bg-[#FDF8EB] text-[#8A630D] border-[#C89B2B] font-semibold'
+                                : 'bg-white text-[#0D221D] border-[#CEDCD6] hover:border-[#0F4C3F]'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate">Lớp {cls.name}</div>
+                              <div className="text-[10px] font-mono text-[#597169]">
+                                Mã: {cls.joinCode}
+                              </div>
+                            </div>
+                            {checked && <Check className="w-3.5 h-3.5 text-[#8A630D] shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-[#597169] text-center py-2">
+                      Bạn chưa tạo lớp nào trong mục Lớp &amp; học sinh.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {assignmentError && (
+                <div className="p-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#B91C1C]">
+                  {assignmentError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAssigningExam(null)}
+                  className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#F8FAF9] cursor-pointer"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingAssignment}
+                  className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer"
+                >
+                  {savingAssignment ? 'Đang lưu...' : 'Lưu mã đề & phân lớp'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

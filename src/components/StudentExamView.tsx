@@ -40,11 +40,19 @@ import type {
 } from '../types';
 import { formatDurationMMSS, formatScore } from '../utils/formatters';
 import { compressExamPhoto } from '../utils/imageUtils';
-import { containsLatexFormula, MathText } from './MathText';
+import {
+  containsLatexFormula,
+  MathText,
+} from './MathText';
 import {
   RemedialPracticePanel,
   type RemedialPracticeData,
 } from './RemedialPracticePanel';
+import {
+  isExamAssignedToClass,
+  isExamRestrictedToClasses,
+  resolveAssignedClassLabels,
+} from '../utils/examAssignment';
 
 interface StudentExamViewProps {
   user: User | null;
@@ -110,6 +118,7 @@ export function StudentExamView({
   const [verifiedStudent, setVerifiedStudent] = useState<{
     studentCode: string;
     studentName: string;
+    classId?: string;
     className: string;
     teacherId: string;
   } | null>(null);
@@ -261,14 +270,15 @@ export function StudentExamView({
       setClassName(hit.className);
       setStudentCodeError(null);
 
-      // If student didn't pick a specific exam yet, match the teacher's published exam if available
-      if (
-        hit.teacherId !== 'sample_teacher' &&
-        selectedExam?.teacherId !== hit.teacherId
-      ) {
-        const teacherExam = availableExams.find((e) => e.teacherId === hit.teacherId);
-        if (teacherExam) {
-          setSelectedExam(teacherExam);
+      // Auto-select matching exam assigned to this student's class
+      if (hit.teacherId !== 'sample_teacher') {
+        const classMatchExam = availableExams.find(
+          (e) =>
+            e.teacherId === hit.teacherId &&
+            isExamAssignedToClass(e, { classId: hit.classId, className: hit.className })
+        );
+        if (classMatchExam) {
+          setSelectedExam(classMatchExam);
         }
       }
       return hit;
@@ -293,6 +303,7 @@ export function StudentExamView({
       setVerifiedStudent({
         studentCode: entry.studentCode,
         studentName: entry.fullName,
+        classId: activeRoster.classId,
         className: activeRoster.className,
         teacherId: activeRoster.teacherId,
       });
@@ -352,10 +363,14 @@ export function StudentExamView({
         }
       }
 
-      if (hit.teacherId !== 'sample_teacher' && selectedExam?.teacherId !== hit.teacherId) {
-        const teacherExam = availableExams.find((e) => e.teacherId === hit.teacherId);
-        if (teacherExam) {
-          setSelectedExam(teacherExam);
+      if (hit.teacherId !== 'sample_teacher') {
+        const classMatchExam = availableExams.find(
+          (e) =>
+            e.teacherId === hit.teacherId &&
+            isExamAssignedToClass(e, { classId: hit.classId, className: hit.className })
+        );
+        if (classMatchExam) {
+          setSelectedExam(classMatchExam);
         }
       }
 
@@ -372,6 +387,71 @@ export function StudentExamView({
       void verifyStudentCode(initialStudentCode);
     }
   }, [user, initialClassCode, initialStudentCode, availableExams]);
+
+  const activeStudentClass =
+    entryMode === 'class' && loadedRoster
+      ? {
+          teacherId: loadedRoster.teacherId,
+          classId: loadedRoster.classId,
+          className: loadedRoster.className,
+        }
+      : entryMode === 'code' && verifiedStudent
+        ? {
+            teacherId: verifiedStudent.teacherId,
+            classId: verifiedStudent.classId,
+            className: verifiedStudent.className,
+          }
+        : entryMode === 'manual' && className.trim()
+          ? {
+              teacherId: undefined,
+              classId: undefined,
+              className: className.trim(),
+            }
+          : null;
+
+  const isRealTeacherClass =
+    Boolean(activeStudentClass?.teacherId) &&
+    activeStudentClass?.teacherId !== 'sample_teacher';
+
+  const displayedExams = availableExams.filter((ex) => {
+    if (isRealTeacherClass && activeStudentClass) {
+      return (
+        ex.teacherId === activeStudentClass.teacherId &&
+        isExamAssignedToClass(ex, {
+          classId: activeStudentClass.classId,
+          className: activeStudentClass.className,
+        })
+      );
+    }
+    if (activeStudentClass?.className && isExamRestrictedToClasses(ex)) {
+      return isExamAssignedToClass(ex, {
+        classId: activeStudentClass.classId,
+        className: activeStudentClass.className,
+      });
+    }
+    return true;
+  });
+
+  const examRestrictedMismatch = Boolean(
+    selectedExam &&
+      activeStudentClass &&
+      ((isRealTeacherClass && selectedExam.teacherId !== activeStudentClass.teacherId) ||
+        (isExamRestrictedToClasses(selectedExam) &&
+          !isExamAssignedToClass(selectedExam, {
+            classId: activeStudentClass.classId,
+            className: activeStudentClass.className,
+          })))
+  );
+
+  useEffect(() => {
+    if (!isRealTeacherClass || examCodeInput.trim()) return;
+    if (displayedExams.length > 0) {
+      const stillValid = selectedExam && displayedExams.some((e) => e.id === selectedExam.id);
+      if (!stillValid) {
+        setSelectedExam(displayedExams[0]);
+      }
+    }
+  }, [isRealTeacherClass, loadedRoster?.classId, verifiedStudent?.studentCode, availableExams]);
 
   const enterFullscreen = async () => {
     try {
@@ -547,6 +627,13 @@ export function StudentExamView({
       return;
     }
 
+    if (examRestrictedMismatch && !isTeacherPreview) {
+      setClassLookupError(
+        `Đề "${selectedExam.title}" không được giao cho Lớp ${activeStudentClass?.className || ''}. Vui lòng chọn đề khác trong danh sách đề của lớp.`
+      );
+      return;
+    }
+
     setRemainingSeconds(selectedExam.durationMinutes * 60);
     setElapsedSeconds(0);
     setViolationCount(0);
@@ -615,9 +702,26 @@ export function StudentExamView({
           questionResults,
         }),
       });
-      const data = await resp.json().catch(() => ({}));
+      const rawText = await resp.text();
+      let data: Record<string, unknown> = {};
+      try {
+        data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {};
+      } catch {
+        data = {};
+      }
       if (!resp.ok) {
-        throw new Error(data.error || 'Không thể tải phân tích nhận xét bài làm.');
+        const apiMsg = typeof data.error === 'string' ? data.error : '';
+        if (apiMsg) {
+          throw new Error(apiMsg);
+        }
+        if (resp.status === 502 || resp.status === 504) {
+          throw new Error(
+            `Máy chủ AI phản hồi quá lâu (HTTP ${resp.status}). Vui lòng bấm Tải lại nhận xét.`
+          );
+        }
+        throw new Error(
+          `Không thể tải phân tích nhận xét bài làm (HTTP ${resp.status}).`
+        );
       }
       setStudentReview({
         overallComment: String(data.overallComment || ''),
@@ -645,6 +749,7 @@ export function StudentExamView({
       explanation: string;
     }> = [];
     exam.questions.forEach((q, idx) => {
+      if (items.length >= 8) return;
       const ans = answers[idx];
       if (!ans) return;
       const isEssayWrong = q.type === 'essay' && Boolean(ans.aiFeedback) && ans.score < q.maxScore;
@@ -689,10 +794,10 @@ export function StudentExamView({
       items.push({
         index: q.index,
         type: q.type,
-        prompt: q.prompt,
-        studentAnswer,
-        correctAnswer,
-        explanation: q.explanation || ans.aiFeedback || '',
+        prompt: q.prompt.slice(0, 600),
+        studentAnswer: studentAnswer.slice(0, 400),
+        correctAnswer: correctAnswer.slice(0, 400),
+        explanation: (q.explanation || ans.aiFeedback || '').slice(0, 500),
       });
     });
     return items;
@@ -714,14 +819,23 @@ export function StudentExamView({
           wrongQuestions,
         }),
       });
-      const data = await resp.json().catch(() => ({}));
+      const rawText = await resp.text();
+      let data: Record<string, unknown> = {};
+      try {
+        data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {};
+      } catch {
+        data = {};
+      }
       if (!resp.ok) {
-        throw new Error(data.error || 'Không thể tạo bài ôn tập AI.');
+        const apiMsg = typeof data.error === 'string' ? data.error : '';
+        throw new Error(
+          apiMsg || `Không thể tạo bài ôn tập AI (HTTP ${resp.status}).`
+        );
       }
       setPracticeData({
         focusSummary: String(data.focusSummary || ''),
         practiceQuestions: Array.isArray(data.practiceQuestions)
-          ? data.practiceQuestions
+          ? (data.practiceQuestions as RemedialPracticeData['practiceQuestions'])
           : [],
       });
     } catch (err) {
@@ -1446,32 +1560,37 @@ export function StudentExamView({
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                     Chọn đề kiểm tra
+                    {isRealTeacherClass && activeStudentClass?.className
+                      ? ` (Lớp ${activeStudentClass.className})`
+                      : ''}
                   </label>
                   {loadingExams ? (
                     <div className="text-xs text-[#597169] py-2">Đang tải danh sách đề...</div>
+                  ) : displayedExams.length === 0 ? (
+                    <div className="px-3.5 py-2.5 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] text-xs text-[#8A630D]">
+                      Lớp {activeStudentClass?.className || 'này'} hiện chưa được giao đề mở nào. Bạn có thể nhập trực tiếp Mã đề ở ô bên cạnh (nếu có).
+                    </div>
                   ) : (
                     <select
-                      value={selectedExam?.id || ''}
+                      value={
+                        selectedExam && displayedExams.some((ex) => ex.id === selectedExam.id)
+                          ? selectedExam.id
+                          : ''
+                      }
                       onChange={(e) => {
-                        const hit = availableExams.find((ex) => ex.id === e.target.value);
+                        const hit = displayedExams.find((ex) => ex.id === e.target.value);
                         if (hit) setSelectedExam(hit);
                       }}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                     >
-                      {[...availableExams]
-                        .sort((a, b) => {
-                          if (loadedRoster && loadedRoster.teacherId !== 'sample_teacher') {
-                            const aMatch = a.teacherId === loadedRoster.teacherId ? 0 : 1;
-                            const bMatch = b.teacherId === loadedRoster.teacherId ? 0 : 1;
-                            if (aMatch !== bMatch) return aMatch - bMatch;
-                          }
-                          return 0;
-                        })
-                        .map((ex) => (
-                          <option key={ex.id} value={ex.id}>
-                            {ex.title} ({ex.questionCount} câu · {ex.durationMinutes} phút)
-                          </option>
-                        ))}
+                      {!displayedExams.some((ex) => ex.id === selectedExam?.id) && (
+                        <option value="">-- Chọn đề của lớp --</option>
+                      )}
+                      {displayedExams.map((ex) => (
+                        <option key={ex.id} value={ex.id}>
+                          {ex.title} ({ex.questionCount} câu · {ex.durationMinutes} phút)
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>
@@ -1492,18 +1611,55 @@ export function StudentExamView({
                       if (found) setSelectedExam(found);
                     }}
                     placeholder="VD: VL12HK1"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm font-mono text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm font-mono uppercase text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
               </div>
 
               {selectedExam && (
                 <div className="p-4 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-xs text-[#4A615A] space-y-1.5">
-                  <div className="font-semibold text-[#0D221D]">{selectedExam.title}</div>
-                  <div className="text-[#8A630D] font-medium">
-                    {selectedExam.subject} · {selectedExam.questionCount} câu ·{' '}
-                    {selectedExam.durationMinutes} phút
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-semibold text-[#0D221D]">{selectedExam.title}</div>
+                    <span className="font-mono font-semibold text-[#8A630D]">
+                      Mã đề: {selectedExam.examCode}
+                    </span>
                   </div>
+                  <div className="text-[#8A630D] font-medium flex flex-wrap items-center gap-2">
+                    <span>
+                      {selectedExam.subject} · {selectedExam.questionCount} câu ·{' '}
+                      {selectedExam.durationMinutes} phút
+                    </span>
+                    {isExamRestrictedToClasses(selectedExam) && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-[#0F4C3F]">
+                          Giao cho: Lớp{' '}
+                          {resolveAssignedClassLabels(selectedExam, teacherClasses).join(', ')}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {examRestrictedMismatch && (
+                    <div
+                      className={`p-2.5 rounded-lg border text-xs ${
+                        isTeacherPreview
+                          ? 'bg-white border-[#C89B2B] text-[#8A630D]'
+                          : 'bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C] font-medium'
+                      }`}
+                    >
+                      {isTeacherPreview
+                        ? `Lưu ý (chế độ xem thử Giáo viên): Đề này đang chỉ giao cho ${
+                            resolveAssignedClassLabels(selectedExam, teacherClasses).length > 0
+                              ? `Lớp ${resolveAssignedClassLabels(selectedExam, teacherClasses).join(', ')}`
+                              : 'lớp khác'
+                          }, không nằm trong danh sách lớp ${activeStudentClass?.className || ''}.`
+                        : `Đề này chỉ được giao cho ${
+                            resolveAssignedClassLabels(selectedExam, teacherClasses).length > 0
+                              ? `Lớp ${resolveAssignedClassLabels(selectedExam, teacherClasses).join(', ')}`
+                              : 'lớp khác'
+                          }. Vui lòng chọn đề đúng lớp ${activeStudentClass?.className || 'của bạn'}.`}
+                    </div>
+                  )}
                   <div className="pt-1.5 border-t border-[#EAD8A6]/70 text-[#3A524A] leading-relaxed">
                     <strong>Quy chế phòng thi:</strong> Hệ thống sẽ bật{' '}
                     <strong>toàn màn hình</strong> khi bắt đầu. Thoát toàn màn hình hoặc
@@ -1517,7 +1673,7 @@ export function StudentExamView({
 
               <button
                 type="submit"
-                disabled={!selectedExam}
+                disabled={!selectedExam || (examRestrictedMismatch && !isTeacherPreview)}
                 className="w-full py-3 px-4 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
               >
                 Bắt đầu làm bài (Bật toàn màn hình)
