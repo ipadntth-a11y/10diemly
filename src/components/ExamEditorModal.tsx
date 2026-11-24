@@ -313,19 +313,19 @@ export function ExamEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl border border-[#E7E5DF] max-w-5xl w-full p-6 space-y-4 my-4 max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-[#082B23]/45 backdrop-blur-[1px] flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl border border-[#DAE5E0] max-w-5xl w-full p-6 space-y-4 my-4 max-h-[94vh] flex flex-col shadow-xl">
         {/* Modal Header */}
-        <div className="flex items-start justify-between gap-4 shrink-0">
+        <div className="flex items-start justify-between gap-4 shrink-0 pb-2 border-b border-[#EDF3F0]">
           <div>
-            <div className="text-[11px] font-semibold tracking-[0.08em] text-[#66706C] uppercase">
+            <div className="text-[11px] font-semibold tracking-[0.08em] text-[#8A630D] uppercase">
               Chỉnh sửa đề thi, đáp án &amp; barem điểm
             </div>
             <div className="flex flex-wrap items-baseline gap-3 mt-0.5">
-              <h3 className="font-serif text-2xl font-semibold text-[#16231F]">
+              <h3 className="font-serif text-2xl font-semibold text-[#0D221D]">
                 Chỉnh sửa đề thi &amp; đáp án
               </h3>
-              <span className="text-xs font-medium text-[#1E4D43] tabular-nums">
+              <span className="text-xs font-semibold text-[#0F4C3F] tabular-nums">
                 {questions.length} câu · Tổng {totalExamPoints} điểm
               </span>
             </div>
@@ -333,7 +333,7 @@ export function ExamEditorModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#66706C] hover:bg-[#F5F4F0] cursor-pointer"
+            className="p-1.5 rounded-lg text-[#597169] hover:bg-[#EFF7F3] cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -343,18 +343,18 @@ export function ExamEditorModal({
           {/* Exam Title, Subject & Duration */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 shrink-0">
             <div className="sm:col-span-6">
-              <label className="block text-xs font-medium text-[#434D49] mb-1">
+              <label className="block text-xs font-medium text-[#3A524A] mb-1">
                 Tên đề kiểm tra
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
               />
             </div>
             <div className="sm:col-span-4">
-              <label className="block text-xs font-medium text-[#434D49] mb-1">
+              <label className="block text-xs font-medium text-[#3A524A] mb-1">
                 Môn học
               </label>
               <input
@@ -362,7 +362,7 @@ export function ExamEditorModal({
                 list="exam-subject-suggestions"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
               />
               <datalist id="exam-subject-suggestions">
                 {SUBJECT_SUGGESTIONS.map((s) => (
@@ -371,7 +371,7 @@ export function ExamEditorModal({
               </datalist>
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-[#434D49] mb-1">
+              <label className="block text-xs font-medium text-[#3A524A] mb-1">
                 Thời gian (phút)
               </label>
               <input
@@ -380,15 +380,15 @@ export function ExamEditorModal({
                 max={180}
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-[#DCD9D0] text-sm tabular-nums focus:outline-none focus:border-[#1E4D43]"
+                className="w-full px-3 py-2 rounded-xl border border-[#CEDCD6] text-sm text-[#0D221D] tabular-nums focus:outline-none focus:border-[#0F4C3F]"
               />
             </div>
           </div>
 
           {/* Filter Tabs + Search + Add Question Toolbar */}
-          <div className="flex flex-col gap-2.5 pb-2.5 border-b border-[#ECEAE4] shrink-0">
+          <div className="flex flex-col gap-2.5 pb-2.5 border-b border-[#EBF1EE] shrink-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="inline-flex flex-wrap p-1 rounded-xl bg-[#F5F4F0] gap-1">
+              <div className="inline-flex flex-wrap p-1 rounded-xl bg-[#E6EEEA] gap-1">
                 {(
                   [
                     { id: 'all', label: `Tất cả (${questions.length})` },
@@ -402,10 +402,10 @@ export function ExamEditorModal({
                     key={tab.id}
                     type="button"
                     onClick={() => setFilterMode(tab.id)}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer tabular-nums ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer tabular-nums whitespace-nowrap ${
                       filterMode === tab.id
-                        ? 'bg-white text-[#1E4D43] font-semibold shadow-sm'
-                        : 'text-[#5C6561] hover:text-[#16231F]'
+                        ? 'bg-white text-[#0F4C3F] font-semibold shadow-sm'
+                        : 'text-[#4A615A] hover:text-[#0D221D]'
                     }`}
                   >
                     {tab.label}
@@ -414,26 +414,26 @@ export function ExamEditorModal({
               </div>
 
               <div className="relative flex-1 min-w-[200px] max-w-xs">
-                <Search className="w-3.5 h-3.5 text-[#7C8581] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-[#698078] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Tìm số câu hoặc từ khóa..."
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-xs focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-xs text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-medium text-[#66706C] mr-1">
+                <span className="text-[11px] font-medium text-[#597169] mr-1">
                   Thêm câu mới:
                 </span>
                 <button
                   type="button"
                   onClick={() => handleAddQuestion('mcq')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#DCD9D0] bg-white text-[#16231F] text-xs font-medium hover:border-[#1E4D43] hover:text-[#1E4D43] cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#CEDCD6] bg-white text-[#0D221D] text-xs font-medium hover:border-[#0F4C3F] hover:text-[#0F4C3F] whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
                   <span>Trắc nghiệm</span>
@@ -441,7 +441,7 @@ export function ExamEditorModal({
                 <button
                   type="button"
                   onClick={() => handleAddQuestion('true_false')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#DCD9D0] bg-white text-[#16231F] text-xs font-medium hover:border-[#1E4D43] hover:text-[#1E4D43] cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#CEDCD6] bg-white text-[#0D221D] text-xs font-medium hover:border-[#0F4C3F] hover:text-[#0F4C3F] whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
                   <span>Đúng / Sai</span>
@@ -449,7 +449,7 @@ export function ExamEditorModal({
                 <button
                   type="button"
                   onClick={() => handleAddQuestion('short_answer')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#DCD9D0] bg-white text-[#16231F] text-xs font-medium hover:border-[#1E4D43] hover:text-[#1E4D43] cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#CEDCD6] bg-white text-[#0D221D] text-xs font-medium hover:border-[#0F4C3F] hover:text-[#0F4C3F] whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
                   <span>Trả lời ngắn</span>
@@ -457,7 +457,7 @@ export function ExamEditorModal({
                 <button
                   type="button"
                   onClick={() => handleAddQuestion('essay')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#1E4D43] bg-[#E5ECE7] text-[#1E4D43] text-xs font-semibold hover:bg-[#D5E3DA] cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#0F4C3F] bg-[#EFF7F3] text-[#0F4C3F] text-xs font-semibold hover:bg-[#DCECE4] whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
                   <span>Tự luận</span>
@@ -468,9 +468,9 @@ export function ExamEditorModal({
                 type="button"
                 disabled={generatingExplanations}
                 onClick={handleGenerateExplanations}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#DCD9D0] bg-white text-[#1E4D43] text-xs font-semibold hover:bg-[#FAF9F6] disabled:opacity-60 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] text-[#7A580B] text-xs font-semibold hover:bg-[#FAF1D6] disabled:opacity-60 transition-colors whitespace-nowrap cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5 text-[#C89B2B]" />
                 <span>
                   {generatingExplanations
                     ? 'AI đang viết lời giải...'
@@ -488,8 +488,8 @@ export function ExamEditorModal({
             className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1"
           >
             {displayedIndices.length === 0 ? (
-              <div className="p-8 rounded-2xl bg-[#FAF9F6] border border-[#E7E5DF] text-center space-y-3">
-                <p className="text-sm text-[#5C6561]">
+              <div className="p-8 rounded-2xl bg-[#F8FAF9] border border-[#DAE5E0] text-center space-y-3">
+                <p className="text-sm text-[#4A615A]">
                   Không có câu hỏi nào khớp bộ lọc hoặc từ khóa đang chọn.
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -499,7 +499,7 @@ export function ExamEditorModal({
                       setFilterMode('all');
                       setSearchTerm('');
                     }}
-                    className="px-4 py-2 rounded-xl border border-[#DCD9D0] bg-white text-xs font-medium text-[#434D49] hover:bg-[#F5F4F0] cursor-pointer"
+                    className="px-4 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs font-medium text-[#3A524A] hover:bg-[#EFF7F3] cursor-pointer"
                   >
                     Hiện tất cả câu hỏi ({questions.length})
                   </button>
@@ -507,9 +507,9 @@ export function ExamEditorModal({
                     <button
                       type="button"
                       onClick={() => handleAddQuestion(filterMode)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-xs font-semibold hover:bg-[#163B33] cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-3.5 h-3.5 text-[#E5C665]" />
                       <span>Thêm câu loại này</span>
                     </button>
                   )}
@@ -526,14 +526,14 @@ export function ExamEditorModal({
                     }}
                     className={`p-4 rounded-2xl border space-y-3 transition-colors ${
                       isInitialFocus
-                        ? 'bg-[#F4FAF6] border-[#1E4D43] ring-2 ring-[#1E4D43]/15'
-                        : 'bg-[#FAF9F6] border-[#E7E5DF]'
+                        ? 'bg-[#EFF7F3] border-[#0F4C3F] ring-2 ring-[#C89B2B]/30'
+                        : 'bg-[#F8FAF9] border-[#DAE5E0]'
                     }`}
                   >
                     {/* Card Top Bar */}
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-bold text-[#16231F]">
+                        <span className="text-sm font-bold text-[#0D221D]">
                           Câu {idx + 1}
                         </span>
                         <select
@@ -575,7 +575,7 @@ export function ExamEditorModal({
                                   : prev.statements,
                             }));
                           }}
-                          className="px-2.5 py-1 rounded-lg border border-[#DCD9D0] bg-white text-xs font-medium text-[#16231F]"
+                          className="px-2.5 py-1 rounded-lg border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                         >
                           <option value="mcq">Trắc nghiệm</option>
                           <option value="true_false">Đúng / Sai</option>
@@ -585,7 +585,7 @@ export function ExamEditorModal({
                       </div>
 
                       <div className="flex items-center gap-1.5 text-xs">
-                        <label className="text-[#5C6561]">Điểm:</label>
+                        <label className="text-[#4A615A]">Điểm:</label>
                         <input
                           type="number"
                           step="0.05"
@@ -598,7 +598,7 @@ export function ExamEditorModal({
                               maxScore: Number(e.target.value) || 0.25,
                             }))
                           }
-                          className="w-16 px-2 py-1 rounded-lg border border-[#DCD9D0] bg-white text-center font-mono tabular-nums"
+                          className="w-16 px-2 py-1 rounded-lg border border-[#CEDCD6] bg-white text-center font-mono text-[#0D221D] tabular-nums focus:outline-none focus:border-[#0F4C3F]"
                         />
 
                         <button
@@ -606,7 +606,7 @@ export function ExamEditorModal({
                           onClick={() => handleMoveQuestion(idx, -1)}
                           disabled={idx === 0}
                           title="Chuyển lên trước"
-                          className="p-1.5 rounded-lg text-[#5C6561] hover:bg-white disabled:opacity-35 cursor-pointer"
+                          className="p-1.5 rounded-lg text-[#4A615A] hover:bg-white disabled:opacity-35 cursor-pointer"
                         >
                           <ArrowUp className="w-3.5 h-3.5" />
                         </button>
@@ -615,7 +615,7 @@ export function ExamEditorModal({
                           onClick={() => handleMoveQuestion(idx, 1)}
                           disabled={idx === questions.length - 1}
                           title="Chuyển xuống sau"
-                          className="p-1.5 rounded-lg text-[#5C6561] hover:bg-white disabled:opacity-35 cursor-pointer"
+                          className="p-1.5 rounded-lg text-[#4A615A] hover:bg-white disabled:opacity-35 cursor-pointer"
                         >
                           <ArrowDown className="w-3.5 h-3.5" />
                         </button>
@@ -624,7 +624,7 @@ export function ExamEditorModal({
                           type="button"
                           onClick={() => handleDeleteQuestion(idx)}
                           title="Xoá câu này"
-                          className="p-1.5 rounded-lg text-[#66706C] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg text-[#597169] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -634,7 +634,7 @@ export function ExamEditorModal({
                     {/* Prompt Editor */}
                     <div>
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                        <label className="text-xs font-medium text-[#434D49]">
+                        <label className="text-xs font-medium text-[#3A524A]">
                           Nội dung đề bài (hỗ trợ LaTeX <code className="font-mono">$...$</code> /{' '}
                           <code className="font-mono">$$...$$</code>)
                         </label>
@@ -651,13 +651,13 @@ export function ExamEditorModal({
                                     : snip.tex,
                                 }))
                               }
-                              className="px-1.5 py-0.5 rounded border border-[#DCD9D0] bg-white text-[10px] font-medium text-[#1E4D43] hover:bg-[#E5ECE7] cursor-pointer"
+                              className="px-1.5 py-0.5 rounded border border-[#CEDCD6] bg-white text-[10px] font-medium text-[#0F4C3F] hover:bg-[#EFF7F3] cursor-pointer"
                               title={`Chèn mẫu ${snip.tex}`}
                             >
                               + {snip.label}
                             </button>
                           ))}
-                          <label className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#DCD9D0] bg-white text-[11px] font-medium text-[#434D49] hover:text-[#1E4D43] cursor-pointer">
+                          <label className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#CEDCD6] bg-white text-[11px] font-medium text-[#3A524A] hover:text-[#0F4C3F] cursor-pointer">
                             <ImageIcon className="w-3 h-3" />
                             <span>+ Ảnh đề bài</span>
                             <input
@@ -682,11 +682,11 @@ export function ExamEditorModal({
                           }))
                         }
                         placeholder="Nhập nội dung đề bài câu hỏi (dùng $...$ cho công thức toán, VD: $\frac{1}{2}mv^2$)..."
-                        className="w-full px-3 py-2 rounded-xl border border-[#DCD9D0] bg-white text-sm text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                        className="w-full px-3 py-2 rounded-xl border border-[#CEDCD6] bg-white text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                       />
                       {containsLatexFormula(q.prompt) && (
-                        <div className="mt-1.5 p-2.5 rounded-xl bg-white border border-[#E7E5DF] text-sm text-[#16231F]">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#1E4D43] mb-0.5">
+                        <div className="mt-1.5 p-2.5 rounded-xl bg-white border border-[#DAE5E0] text-sm text-[#0D221D]">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0F4C3F] mb-0.5">
                             Hiển thị công thức
                           </div>
                           <MathText text={q.prompt} className="whitespace-pre-line leading-relaxed" />
@@ -702,7 +702,7 @@ export function ExamEditorModal({
                             <img
                               src={url}
                               alt={`Hình đề câu ${idx + 1}`}
-                              className="max-h-28 rounded-lg border border-[#DCD9D0] object-contain bg-white"
+                              className="max-h-28 rounded-lg border border-[#CEDCD6] object-contain bg-white"
                             />
                             <button
                               type="button"
@@ -725,9 +725,9 @@ export function ExamEditorModal({
                     {/* Type-specific fields */}
                     {q.type === 'mcq' && q.options && (
                       <div className="space-y-1.5">
-                        <div className="text-[11px] text-[#5C6561]">
+                        <div className="text-[11px] text-[#4A615A]">
                           Sửa nội dung phương án hoặc bấm vào nút{' '}
-                          <strong className="text-[#16231F]">A / B / C / D</strong> để chọn lại đáp án đúng:
+                          <strong className="text-[#0D221D]">A / B / C / D</strong> để chọn lại đáp án đúng:
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {q.options.map((opt, optIdx) => {
@@ -736,7 +736,7 @@ export function ExamEditorModal({
                               <div
                                 key={optIdx}
                                 className={`flex items-center gap-2 p-2 rounded-xl border bg-white ${
-                                  isCorrect ? 'border-[#16A34A] ring-1 ring-[#16A34A]/20' : 'border-[#DCD9D0]'
+                                  isCorrect ? 'border-[#0F6D4F] ring-1 ring-[#0F6D4F]/20' : 'border-[#CEDCD6]'
                                 }`}
                               >
                                 <button
@@ -749,8 +749,8 @@ export function ExamEditorModal({
                                   }
                                   className={`w-6 h-6 rounded-md text-xs font-bold shrink-0 cursor-pointer ${
                                     isCorrect
-                                      ? 'bg-[#16A34A] text-white'
-                                      : 'bg-[#F5F4F0] text-[#5C6561] hover:bg-[#E7E5DF]'
+                                      ? 'bg-[#0F6D4F] text-white'
+                                      : 'bg-[#EFF7F3] text-[#4A615A] hover:bg-[#DAE5E0]'
                                   }`}
                                   title="Chọn làm đáp án đúng"
                                 >
@@ -767,10 +767,10 @@ export function ExamEditorModal({
                                       ),
                                     }))
                                   }
-                                  className="flex-1 min-w-0 text-xs text-[#16231F] focus:outline-none"
+                                  className="flex-1 min-w-0 text-xs text-[#0D221D] focus:outline-none"
                                 />
                                 {containsLatexFormula(opt) && (
-                                  <span className="text-xs text-[#1E4D43] shrink-0 max-w-[45%] truncate">
+                                  <span className="text-xs text-[#0F4C3F] shrink-0 max-w-[45%] truncate">
                                     <MathText text={opt} inline />
                                   </span>
                                 )}
@@ -783,15 +783,15 @@ export function ExamEditorModal({
 
                     {q.type === 'true_false' && q.statements && (
                       <div className="space-y-1.5">
-                        <div className="text-[11px] text-[#5C6561]">
-                          Bấm nút <strong className="text-[#16231F]">Đúng / Sai</strong> ở cuối mỗi ý để đổi đáp án chuẩn:
+                        <div className="text-[11px] text-[#4A615A]">
+                          Bấm nút <strong className="text-[#0D221D]">Đúng / Sai</strong> ở cuối mỗi ý để đổi đáp án chuẩn:
                         </div>
                         {q.statements.map((st, sIdx) => (
                           <div
                             key={sIdx}
-                            className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-[#DCD9D0]"
+                            className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-[#CEDCD6]"
                           >
-                            <span className="text-xs font-bold text-[#5C6561] w-5 shrink-0">
+                            <span className="text-xs font-bold text-[#4A615A] w-5 shrink-0">
                               {'abcd'[sIdx]})
                             </span>
                             <input
@@ -805,10 +805,10 @@ export function ExamEditorModal({
                                   ),
                                 }))
                               }
-                              className="flex-1 min-w-0 text-xs text-[#16231F] focus:outline-none"
+                              className="flex-1 min-w-0 text-xs text-[#0D221D] focus:outline-none"
                             />
                             {containsLatexFormula(st.text) && (
-                              <span className="text-xs text-[#1E4D43] shrink-0 max-w-[40%] truncate">
+                              <span className="text-xs text-[#0F4C3F] shrink-0 max-w-[40%] truncate">
                                 <MathText text={st.text} inline />
                               </span>
                             )}
@@ -824,8 +824,8 @@ export function ExamEditorModal({
                               }
                               className={`px-2.5 py-0.5 rounded text-[11px] font-semibold shrink-0 cursor-pointer ${
                                 st.isTrue
-                                  ? 'bg-[#DCFCE7] text-[#166534]'
-                                  : 'bg-[#FEE2E2] text-[#991B1B]'
+                                  ? 'bg-[#EFF7F3] text-[#0F6D4F] border border-[#C5DDD3]'
+                                  : 'bg-[#FEF2F2] text-[#B91C1C] border border-[#FECACA]'
                               }`}
                             >
                               {st.isTrue ? 'Đúng' : 'Sai'}
@@ -837,7 +837,7 @@ export function ExamEditorModal({
 
                     {q.type === 'short_answer' && (
                       <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="font-medium text-[#434D49]">
+                        <span className="font-medium text-[#3A524A]">
                           Đáp số đúng (tối đa 4 ký tự):
                         </span>
                         <input
@@ -851,9 +851,9 @@ export function ExamEditorModal({
                             }))
                           }
                           placeholder="VD: 2,5"
-                          className="w-24 px-2.5 py-1.5 rounded-lg border border-[#DCD9D0] bg-white font-mono font-semibold text-[#1E4D43]"
+                          className="w-24 px-2.5 py-1.5 rounded-lg border border-[#CEDCD6] bg-white font-mono font-semibold text-[#0F4C3F] focus:outline-none focus:border-[#0F4C3F]"
                         />
-                        <span className="text-[11px] text-[#66706C]">
+                        <span className="text-[11px] text-[#597169]">
                           (Hệ thống tự chấp nhận dấu chấm hoặc phẩy thập phân khi chấm)
                         </span>
                       </div>
@@ -862,7 +862,7 @@ export function ExamEditorModal({
                     {q.type === 'essay' && (
                       <div>
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                          <label className="text-xs font-medium text-[#434D49]">
+                          <label className="text-xs font-medium text-[#3A524A]">
                             Đáp án chuẩn / Barem chấm (Công thức · Thay số · Đáp số · Đơn vị)
                           </label>
                           <button
@@ -881,7 +881,7 @@ export function ExamEditorModal({
                                   : template,
                               }));
                             }}
-                            className="px-2 py-0.5 rounded-lg border border-[#DCD9D0] bg-white text-[11px] font-medium text-[#1E4D43] hover:bg-[#E5ECE7] cursor-pointer"
+                            className="px-2 py-0.5 rounded-lg border border-[#EAD8A6] bg-[#FDF8EB] text-[11px] font-semibold text-[#8A630D] hover:bg-[#FAF1D6] cursor-pointer"
                           >
                             + Mẫu Barem 4 bước
                           </button>
@@ -896,10 +896,10 @@ export function ExamEditorModal({
                             }))
                           }
                           placeholder="VD: Công thức Q=λm (0,25đ); Đổi đơn vị & thay số (0,25đ); Đáp số 668 (0,25đ); Đơn vị kJ (0,25đ)"
-                          className="w-full px-3 py-2 rounded-xl border border-[#DCD9D0] bg-white text-xs text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                          className="w-full px-3 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                         />
                         {containsLatexFormula(q.correctAnswer) && (
-                          <div className="mt-1.5 p-2 rounded-lg bg-white border border-[#E7E5DF] text-xs text-[#16231F]">
+                          <div className="mt-1.5 p-2 rounded-lg bg-white border border-[#DAE5E0] text-xs text-[#0D221D]">
                             <MathText text={q.correctAnswer} inline />
                           </div>
                         )}
@@ -909,12 +909,12 @@ export function ExamEditorModal({
                     {/* Explanation / Solution Guide */}
                     <div>
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                        <label className="text-xs font-medium text-[#434D49]">
+                        <label className="text-xs font-medium text-[#3A524A]">
                           {q.type === 'essay'
                             ? 'Hướng dẫn giải chi tiết (Tự luận)'
                             : 'Lời giải / ghi chú'}
                         </label>
-                        <label className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#DCD9D0] bg-white text-[11px] font-medium text-[#434D49] hover:text-[#1E4D43] cursor-pointer">
+                        <label className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#CEDCD6] bg-white text-[11px] font-medium text-[#3A524A] hover:text-[#0F4C3F] cursor-pointer">
                           <ImageIcon className="w-3 h-3" />
                           <span>+ Ảnh lời giải</span>
                           <input
@@ -938,11 +938,11 @@ export function ExamEditorModal({
                           }))
                         }
                         placeholder="Nhập các bước giải chi tiết hoặc hướng dẫn chấm (hỗ trợ $...$ LaTeX)..."
-                        className="w-full px-3 py-2 rounded-xl border border-[#DCD9D0] bg-white text-xs text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                        className="w-full px-3 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                       />
                       {containsLatexFormula(q.explanation) && (
-                        <div className="mt-1.5 p-2.5 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] text-xs text-[#1F3A2B]">
-                          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#1E7E48] mb-0.5">
+                        <div className="mt-1.5 p-2.5 rounded-xl bg-[#F0FBF6] border border-[#C5DDD3] text-xs text-[#0D221D]">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0F6D4F] mb-0.5">
                             Hiển thị công thức lời giải
                           </div>
                           <MathText
@@ -959,7 +959,7 @@ export function ExamEditorModal({
                               <img
                                 src={url}
                                 alt={`Ảnh lời giải câu ${idx + 1}`}
-                                className="max-h-24 rounded-lg border border-[#DCD9D0] object-contain bg-white"
+                                className="max-h-24 rounded-lg border border-[#CEDCD6] object-contain bg-white"
                               />
                               <button
                                 type="button"
@@ -988,16 +988,16 @@ export function ExamEditorModal({
           </div>
 
           {examSubmissions.length > 0 && (
-            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E] cursor-pointer shrink-0">
+            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-xs text-[#7A580B] cursor-pointer shrink-0">
               <input
                 type="checkbox"
                 checked={regradeExisting}
                 onChange={(e) => setRegradeExisting(e.target.checked)}
-                className="mt-0.5 rounded border-[#D97706] text-[#1E4D43] focus:ring-[#1E4D43]"
+                className="mt-0.5 rounded border-[#C89B2B] text-[#0F4C3F] focus:ring-[#0F4C3F]"
               />
               <span className="leading-relaxed">
                 <strong className="inline-flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" />
+                  <RefreshCw className="w-3 h-3 text-[#C89B2B]" />
                   Tự động chấm lại điểm cho {examSubmissions.length} bài học sinh đã nộp
                 </strong>{' '}
                 theo đáp án &amp; thang điểm mới vừa sửa (áp dụng cho Trắc nghiệm, Đúng/Sai, Trả lời ngắn; giữ nguyên điểm &amp; nhận xét Tự luận đã chấm).
@@ -1012,20 +1012,20 @@ export function ExamEditorModal({
           )}
 
           {/* Footer Buttons */}
-          <div className="flex justify-end gap-2 pt-2 border-t border-[#ECEAE4] shrink-0">
+          <div className="flex justify-end gap-2 pt-2 border-t border-[#EBF1EE] shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-[#DCD9D0] text-sm font-medium text-[#434D49] hover:bg-[#F5F4F0] cursor-pointer"
+              className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#EFF7F3] cursor-pointer"
             >
               Đóng
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] disabled:opacity-60 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer shadow-xs"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-4 h-4 text-[#E5C665]" />
               <span>
                 {saving
                   ? regradeExisting && examSubmissions.length > 0

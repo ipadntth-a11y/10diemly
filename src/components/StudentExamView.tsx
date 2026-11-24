@@ -1018,9 +1018,9 @@ export function StudentExamView({
   handleSubmitRef.current = handleSubmitExam;
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#16231F] flex flex-col">
-      {/* Top Preview / Student Bar */}
-      <header className="bg-white border-b border-[#E7E5DF] px-6 h-14 flex items-center justify-between gap-4 sticky top-0 z-30">
+    <div className="min-h-screen bg-[#F6F8F7] text-[#0D221D] flex flex-col">
+      {/* Top Preview / Student Bar — Deep Imperial Jade & Champagne Gold */}
+      <header className="bg-[#0A362C] text-white border-b border-[#C89B2B]/35 px-4 sm:px-6 h-14 flex items-center justify-between gap-4 sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
@@ -1028,19 +1028,19 @@ export function StudentExamView({
               await exitFullscreenSafe();
               onExit();
             }}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1E4D43] hover:text-[#163B33] whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#F7E5A9] hover:text-white whitespace-nowrap cursor-pointer transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 text-[#E5C665]" />
             <span>
               {isTeacherPreview ? 'Quay lại giao diện Giáo viên' : 'Về trang đăng nhập'}
             </span>
           </button>
           {isTeacherPreview ? (
-            <span className="hidden sm:inline text-xs text-[#66706C]">
+            <span className="hidden sm:inline text-xs text-[#A3C2B8]">
               · Đang xem thử chế độ Học sinh
             </span>
           ) : user?.email ? (
-            <span className="hidden sm:inline text-xs text-[#66706C] truncate">
+            <span className="hidden sm:inline text-xs text-[#A3C2B8] truncate">
               · {user.email}
             </span>
           ) : null}
@@ -1052,21 +1052,21 @@ export function StudentExamView({
               <button
                 type="button"
                 onClick={enterFullscreen}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#E5ECE7] text-[#1E4D43] text-xs font-semibold hover:bg-[#D5E3DA] cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#124E40] border border-[#C89B2B]/40 text-[#F7E5A9] text-xs font-semibold hover:bg-[#176150] whitespace-nowrap cursor-pointer"
               >
-                <Maximize2 className="w-3.5 h-3.5" />
+                <Maximize2 className="w-3.5 h-3.5 text-[#E5C665]" />
                 <span>Bật toàn màn hình</span>
               </button>
             )}
             <span
               className={`text-xs font-semibold tabular-nums ${
-                violationCount > 0 ? 'text-[#B45309]' : 'text-[#5C6561]'
+                violationCount > 0 ? 'text-[#FCD34D]' : 'text-[#A3C2B8]'
               }`}
             >
               Thoát: {violationCount}/{MAX_ALLOWED_EXITS} lần
             </span>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F5F4F0] font-mono text-sm font-semibold text-[#16231F] tabular-nums">
-              <Clock className="w-3.5 h-3.5 text-[#1E4D43]" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#124E40] border border-[#C89B2B]/45 font-mono text-sm font-semibold text-[#F7E5A9] tabular-nums">
+              <Clock className="w-3.5 h-3.5 text-[#E5C665]" />
               <span>{formatDurationMMSS(remainingSeconds)}</span>
             </div>
           </div>
@@ -1076,16 +1076,16 @@ export function StudentExamView({
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
         {/* PHASE 1: SETUP */}
         {phase === 'setup' && (
-          <div className="max-w-2xl mx-auto bg-white border border-[#E7E5DF] rounded-2xl p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="max-w-2xl mx-auto bg-white border border-[#DAE5E0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-[#EDF3F0]">
               <div>
-                <div className="text-xs font-medium tracking-[0.08em] text-[#1E4D43] uppercase">
+                <div className="text-xs font-semibold tracking-[0.08em] text-[#8A630D] uppercase">
                   Phòng thi trực tuyến
                 </div>
-                <h1 className="font-serif text-3xl font-semibold text-[#16231F] mt-1">
+                <h1 className="font-serif text-3xl font-semibold text-[#0D221D] mt-1">
                   Vào lớp &amp; chọn tên làm bài
                 </h1>
-                <p className="text-sm text-[#5C6561] mt-1">
+                <p className="text-sm text-[#4A615A] mt-1">
                   Nhập mã lớp do thầy cô cung cấp, bấm chọn đúng tên của bạn rồi chọn đề để bắt đầu.
                 </p>
               </div>
@@ -1093,7 +1093,7 @@ export function StudentExamView({
                 <button
                   type="button"
                   onClick={onSignInRequest}
-                  className="px-3.5 py-2 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-[#16231F] text-xs font-medium hover:bg-[#F0EEE8] whitespace-nowrap cursor-pointer self-start"
+                  className="px-3.5 py-2 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-[#0D221D] text-xs font-medium hover:bg-[#EFF7F3] whitespace-nowrap cursor-pointer self-start"
                 >
                   Đăng nhập Google
                 </button>
@@ -1102,7 +1102,7 @@ export function StudentExamView({
 
             <form onSubmit={handleStartExam} className="space-y-5">
               {/* Entry Mode Switcher */}
-              <div className="inline-flex flex-wrap p-1 rounded-xl bg-[#F5F4F0] gap-1">
+              <div className="inline-flex flex-wrap p-1 rounded-xl bg-[#E6EEEA] gap-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -1111,8 +1111,8 @@ export function StudentExamView({
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                     entryMode === 'class'
-                      ? 'bg-white text-[#1E4D43] font-semibold shadow-sm'
-                      : 'text-[#5C6561] hover:text-[#16231F]'
+                      ? 'bg-white text-[#0F4C3F] font-semibold shadow-sm'
+                      : 'text-[#4A615A] hover:text-[#0D221D]'
                   }`}
                 >
                   1. Vào lớp chọn tên
@@ -1126,8 +1126,8 @@ export function StudentExamView({
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                       entryMode === 'code'
-                        ? 'bg-white text-[#1E4D43] font-semibold shadow-sm'
-                        : 'text-[#5C6561] hover:text-[#16231F]'
+                        ? 'bg-white text-[#0F4C3F] font-semibold shadow-sm'
+                        : 'text-[#4A615A] hover:text-[#0D221D]'
                     }`}
                   >
                     2. Nhập Mã học sinh
@@ -1142,8 +1142,8 @@ export function StudentExamView({
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                       entryMode === 'manual'
-                        ? 'bg-white text-[#1E4D43] font-semibold shadow-sm'
-                        : 'text-[#5C6561] hover:text-[#16231F]'
+                        ? 'bg-white text-[#0F4C3F] font-semibold shadow-sm'
+                        : 'text-[#4A615A] hover:text-[#0D221D]'
                     }`}
                   >
                     2. Tự điền họ tên
@@ -1153,17 +1153,17 @@ export function StudentExamView({
 
               {/* MODE 1: JOIN CLASS & PICK STUDENT NAME */}
               {entryMode === 'class' && (
-                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-4">
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-4">
                   <div>
                     <label
                       htmlFor="setup-class-code"
-                      className="block text-xs font-semibold text-[#16231F] mb-1.5"
+                      className="block text-xs font-semibold text-[#0D221D] mb-1.5"
                     >
                       Bước 1: Nhập Mã lớp học *
                     </label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <Users className="w-4 h-4 text-[#7C8581] absolute left-3 top-1/2 -translate-y-1/2" />
+                        <Users className="w-4 h-4 text-[#698078] absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                           id="setup-class-code"
                           type="text"
@@ -1180,14 +1180,14 @@ export function StudentExamView({
                             }
                           }}
                           placeholder="Ví dụ: 12A1_XXXX hoặc LY12A1..."
-                          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#DCD9D0] bg-white text-sm font-mono uppercase focus:outline-none focus:border-[#1E4D43]"
+                          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-sm font-mono uppercase text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                         />
                       </div>
                       <button
                         type="button"
                         disabled={lookingUpClass}
                         onClick={() => void lookupClassByCode(classCodeInput)}
-                        className="px-4 py-2.5 rounded-xl bg-[#1E4D43] text-white text-xs font-semibold hover:bg-[#163B33] whitespace-nowrap disabled:opacity-60 cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] whitespace-nowrap disabled:opacity-60 cursor-pointer"
                       >
                         {lookingUpClass ? 'Đang mở lớp...' : 'Vào lớp'}
                       </button>
@@ -1196,7 +1196,7 @@ export function StudentExamView({
                     {/* Quick class shortcuts for teacher preview or demo */}
                     {isTeacherPreview && teacherClasses.length > 0 ? (
                       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="text-[#66706C]">Lớp của thầy cô:</span>
+                        <span className="text-[#597169]">Lớp của thầy cô:</span>
                         {teacherClasses.slice(0, 6).map((cls) => (
                           <button
                             key={cls.id}
@@ -1204,8 +1204,8 @@ export function StudentExamView({
                             onClick={() => void lookupClassByCode(cls.joinCode)}
                             className={`px-2 py-0.5 rounded-md border text-xs font-medium cursor-pointer ${
                               loadedRoster?.joinCode === cls.joinCode
-                                ? 'border-[#1E4D43] bg-[#E5ECE7] text-[#1E4D43]'
-                                : 'border-[#DCD9D0] bg-white text-[#434D49] hover:border-[#1E4D43]'
+                                ? 'border-[#0F4C3F] bg-[#EFF7F3] text-[#0F4C3F]'
+                                : 'border-[#CEDCD6] bg-white text-[#3A524A] hover:border-[#0F4C3F]'
                             }`}
                           >
                             {cls.name} ({cls.joinCode})
@@ -1213,14 +1213,14 @@ export function StudentExamView({
                         ))}
                       </div>
                     ) : !loadedRoster ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-[#66706C]">
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-[#597169]">
                         <span>Chưa có mã lớp? Thử lớp mẫu:</span>
                         {(['LY12A1', 'LY12A2', 'LY12A5'] as const).map((sampleCode) => (
                           <button
                             key={sampleCode}
                             type="button"
                             onClick={() => void lookupClassByCode(sampleCode)}
-                            className="px-2 py-0.5 rounded-md border border-[#DCD9D0] bg-white font-mono text-[#1E4D43] hover:bg-[#E5ECE7] cursor-pointer"
+                            className="px-2 py-0.5 rounded-md border border-[#EAD8A6] bg-[#FDF8EB] font-mono text-[#8A630D] hover:bg-[#FAF1D6] cursor-pointer"
                           >
                             {sampleCode}
                           </button>
@@ -1236,9 +1236,9 @@ export function StudentExamView({
                   )}
 
                   {loadedRoster && (
-                    <div className="space-y-3 pt-2 border-t border-[#E7E5DF]">
+                    <div className="space-y-3 pt-2 border-t border-[#DAE5E0]">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-xs text-[#166534] font-semibold flex items-center gap-1.5">
+                        <div className="text-xs text-[#0F6D4F] font-semibold flex items-center gap-1.5">
                           <CheckCircle2 className="w-4 h-4 shrink-0" />
                           <span>
                             Đã vào Lớp {loadedRoster.className} · {loadedRoster.subject} (
@@ -1257,7 +1257,7 @@ export function StudentExamView({
                               setVerifiedStudent(null);
                             }
                           }}
-                          className="text-[11px] font-medium text-[#5C6561] hover:text-[#16231F] underline cursor-pointer"
+                          className="text-[11px] font-medium text-[#4A615A] hover:text-[#0D221D] underline cursor-pointer"
                         >
                           Đổi lớp khác
                         </button>
@@ -1265,23 +1265,23 @@ export function StudentExamView({
 
                       <div>
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                          <label className="text-xs font-semibold text-[#16231F]">
+                          <label className="text-xs font-semibold text-[#0D221D]">
                             Bước 2: Chọn tên của bạn trong lớp *
                           </label>
                           <div className="relative w-full sm:w-56">
-                            <Search className="w-3.5 h-3.5 text-[#7C8581] absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <Search className="w-3.5 h-3.5 text-[#698078] absolute left-2.5 top-1/2 -translate-y-1/2" />
                             <input
                               type="text"
                               value={rosterSearch}
                               onChange={(e) => setRosterSearch(e.target.value)}
                               placeholder="Tìm nhanh tên bạn..."
-                              className="w-full pl-8 pr-2.5 py-1.5 rounded-lg border border-[#DCD9D0] bg-white text-xs focus:outline-none focus:border-[#1E4D43]"
+                              className="w-full pl-8 pr-2.5 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-xs text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                             />
                           </div>
                         </div>
 
                         {loadedRoster.studentEntries.length === 0 ? (
-                          <div className="p-4 rounded-xl bg-white border border-[#E7E5DF] text-xs text-[#66706C] text-center">
+                          <div className="p-4 rounded-xl bg-white border border-[#DAE5E0] text-xs text-[#597169] text-center">
                             Lớp {loadedRoster.className} hiện chưa có tên học sinh nào trong danh sách. Hãy nhờ thầy cô thêm danh sách học sinh hoặc đăng nhập Google để làm bài.
                           </div>
                         ) : (
@@ -1304,22 +1304,22 @@ export function StudentExamView({
                                     onClick={() => handleSelectRosterStudent(stu)}
                                     className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-left transition-colors cursor-pointer ${
                                       isPicked
-                                        ? 'bg-[#E5ECE7] border-[#1E4D43] ring-1 ring-[#1E4D43]/20'
-                                        : 'bg-white border-[#DCD9D0] hover:border-[#1E4D43]/60'
+                                        ? 'bg-[#EFF7F3] border-[#0F4C3F] ring-1 ring-[#C89B2B]/45'
+                                        : 'bg-white border-[#CEDCD6] hover:border-[#0F4C3F]/60'
                                     }`}
                                   >
                                     <div className="min-w-0">
-                                      <div className="text-xs font-semibold text-[#16231F] truncate">
+                                      <div className="text-xs font-semibold text-[#0D221D] truncate">
                                         {sIdx + 1}. {stu.fullName}
                                       </div>
                                       {stu.studentCode && (
-                                        <div className="text-[11px] font-mono text-[#5C6561]">
+                                        <div className="text-[11px] font-mono text-[#4A615A]">
                                           Mã HS: {stu.studentCode}
                                         </div>
                                       )}
                                     </div>
                                     {isPicked && (
-                                      <CheckCircle2 className="w-4 h-4 text-[#1E4D43] shrink-0" />
+                                      <CheckCircle2 className="w-4 h-4 text-[#0F4C3F] shrink-0" />
                                     )}
                                   </button>
                                 );
@@ -1329,8 +1329,8 @@ export function StudentExamView({
                       </div>
 
                       {selectedRosterEntry && (
-                        <div className="p-2.5 rounded-xl bg-[#F2FBF5] border border-[#BBF7D0] text-xs text-[#166534] flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <div className="p-2.5 rounded-xl bg-[#F0FBF6] border border-[#C5DDD3] text-xs text-[#0A362C] flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-[#0F6D4F] shrink-0" />
                           <span>
                             Bạn đã chọn: <strong>{selectedRosterEntry.fullName}</strong> · Lớp{' '}
                             <strong>{loadedRoster.className}</strong>
@@ -1347,17 +1347,17 @@ export function StudentExamView({
 
               {/* MODE 2 (Guest fallback): STUDENT CODE */}
               {entryMode === 'code' && !user && (
-                <div className="p-4 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-3">
+                <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-3">
                   <div>
                     <label
                       htmlFor="setup-student-code"
-                      className="block text-xs font-semibold text-[#16231F] mb-1.5"
+                      className="block text-xs font-semibold text-[#0D221D] mb-1.5"
                     >
                       Mã học sinh *
                     </label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <KeyRound className="w-4 h-4 text-[#7C8581] absolute left-3 top-1/2 -translate-y-1/2" />
+                        <KeyRound className="w-4 h-4 text-[#698078] absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                           id="setup-student-code"
                           type="text"
@@ -1377,22 +1377,22 @@ export function StudentExamView({
                             if (studentCodeError) setStudentCodeError(null);
                           }}
                           placeholder="Ví dụ: HS1201..."
-                          className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#DCD9D0] bg-white text-sm font-mono uppercase focus:outline-none focus:border-[#1E4D43]"
+                          className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#CEDCD6] bg-white text-sm font-mono uppercase text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                         />
                       </div>
                       <button
                         type="button"
                         disabled={verifyingCode}
                         onClick={() => verifyStudentCode(studentCodeInput)}
-                        className="px-3.5 py-2 rounded-xl border border-[#1E4D43] bg-white text-[#1E4D43] text-xs font-semibold hover:bg-[#E5ECE7] whitespace-nowrap disabled:opacity-60 cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl border border-[#0F4C3F] bg-white text-[#0F4C3F] text-xs font-semibold hover:bg-[#EFF7F3] whitespace-nowrap disabled:opacity-60 cursor-pointer"
                       >
                         {verifyingCode ? 'Đang kiểm tra...' : 'Kiểm tra mã'}
                       </button>
                     </div>
 
                     {verifiedStudent && (
-                      <div className="mt-2 p-2.5 rounded-lg bg-[#F2FBF5] border border-[#BBF7D0] text-xs text-[#166534] flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <div className="mt-2 p-2.5 rounded-lg bg-[#F0FBF6] border border-[#C5DDD3] text-xs text-[#0A362C] flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-[#0F6D4F] shrink-0" />
                         <span>
                           Đã xác thực mã <strong>{verifiedStudent.studentCode}</strong>:{' '}
                           <strong>{verifiedStudent.studentName}</strong> · Lớp{' '}
@@ -1414,7 +1414,7 @@ export function StudentExamView({
               {entryMode === 'manual' && user && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium text-[#434D49] mb-1.5">
+                    <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                       Họ và tên học sinh *
                     </label>
                     <input
@@ -1423,11 +1423,11 @@ export function StudentExamView({
                       value={studentName}
                       onChange={(e) => setStudentName(e.target.value)}
                       placeholder="Nguyễn Văn An"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-white text-sm focus:outline-none focus:border-[#1E4D43]"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[#434D49] mb-1.5">
+                    <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                       Lớp
                     </label>
                     <input
@@ -1435,7 +1435,7 @@ export function StudentExamView({
                       value={className}
                       onChange={(e) => setClassName(e.target.value)}
                       placeholder="12A1"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-white text-sm focus:outline-none focus:border-[#1E4D43]"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                     />
                   </div>
                 </div>
@@ -1444,11 +1444,11 @@ export function StudentExamView({
               {/* Step 3: Select Exam */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-[#434D49] mb-1.5">
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                     Chọn đề kiểm tra
                   </label>
                   {loadingExams ? (
-                    <div className="text-xs text-[#66706C] py-2">Đang tải danh sách đề...</div>
+                    <div className="text-xs text-[#597169] py-2">Đang tải danh sách đề...</div>
                   ) : (
                     <select
                       value={selectedExam?.id || ''}
@@ -1456,7 +1456,7 @@ export function StudentExamView({
                         const hit = availableExams.find((ex) => ex.id === e.target.value);
                         if (hit) setSelectedExam(hit);
                       }}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-white text-sm text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                     >
                       {[...availableExams]
                         .sort((a, b) => {
@@ -1477,7 +1477,7 @@ export function StudentExamView({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[#434D49] mb-1.5">
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                     Tìm mã đề (tuỳ chọn)
                   </label>
                   <input
@@ -1492,19 +1492,19 @@ export function StudentExamView({
                       if (found) setSelectedExam(found);
                     }}
                     placeholder="VD: VL12HK1"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm font-mono focus:outline-none focus:border-[#1E4D43]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm font-mono text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
               </div>
 
               {selectedExam && (
-                <div className="p-4 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] text-xs text-[#5C6561] space-y-1.5">
-                  <div className="font-semibold text-[#16231F]">{selectedExam.title}</div>
-                  <div>
+                <div className="p-4 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-xs text-[#4A615A] space-y-1.5">
+                  <div className="font-semibold text-[#0D221D]">{selectedExam.title}</div>
+                  <div className="text-[#8A630D] font-medium">
                     {selectedExam.subject} · {selectedExam.questionCount} câu ·{' '}
                     {selectedExam.durationMinutes} phút
                   </div>
-                  <div className="pt-1 border-t border-[#ECEAE4] text-[#434D49] leading-relaxed">
+                  <div className="pt-1.5 border-t border-[#EAD8A6]/70 text-[#3A524A] leading-relaxed">
                     <strong>Quy chế phòng thi:</strong> Hệ thống sẽ bật{' '}
                     <strong>toàn màn hình</strong> khi bắt đầu. Thoát toàn màn hình hoặc
                     chuyển cửa sổ sẽ bị ghi nhận (chỉ miễn khi{' '}
@@ -1518,7 +1518,7 @@ export function StudentExamView({
               <button
                 type="submit"
                 disabled={!selectedExam}
-                className="w-full py-3 px-4 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors disabled:opacity-60 cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
               >
                 Bắt đầu làm bài (Bật toàn màn hình)
               </button>
@@ -1530,9 +1530,9 @@ export function StudentExamView({
         {phase === 'taking' && selectedExam && (
           <div className="space-y-5">
             {violationBanner && (
-              <div className="p-3.5 rounded-xl bg-[#FEF3C7] border border-[#FDE68A] flex flex-wrap items-center justify-between gap-3 text-xs text-[#92400E]">
+              <div className="p-3.5 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] flex flex-wrap items-center justify-between gap-3 text-xs text-[#7A580B]">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-[#C89B2B] shrink-0" />
                   <span>
                     Hệ thống đã ghi nhận bạn thoát toàn màn hình / rời cửa sổ làm bài (
                     <strong className="tabular-nums">
@@ -1546,7 +1546,7 @@ export function StudentExamView({
                     <button
                       type="button"
                       onClick={enterFullscreen}
-                      className="px-2.5 py-1 rounded-lg bg-[#92400E] text-white font-semibold cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-[#8A630D] text-white font-semibold cursor-pointer"
                     >
                       Bật toàn màn hình
                     </button>
@@ -1563,9 +1563,9 @@ export function StudentExamView({
             )}
 
             {needsPhotoReturnFullscreen && !isFullscreen && !showViolationModal && (
-              <div className="p-3.5 rounded-xl bg-[#F2FBF5] border border-[#BBF7D0] flex flex-wrap items-center justify-between gap-3 text-xs text-[#166534]">
+              <div className="p-3.5 rounded-xl bg-[#F0FBF6] border border-[#C5DDD3] flex flex-wrap items-center justify-between gap-3 text-xs text-[#0A362C]">
                 <div className="flex items-center gap-2">
-                  <Camera className="w-4 h-4 shrink-0" />
+                  <Camera className="w-4 h-4 text-[#0F6D4F] shrink-0" />
                   <span>
                     Đã hoàn tất bước chụp ảnh câu tự luận (được miễn ghi nhận vi phạm).
                     Vui lòng bật lại toàn màn hình để tiếp tục làm bài.
@@ -1574,9 +1574,9 @@ export function StudentExamView({
                 <button
                   type="button"
                   onClick={enterFullscreen}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E4D43] text-white font-semibold hover:bg-[#163B33] cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F4C3F] text-white font-semibold hover:bg-[#0A362C] cursor-pointer"
                 >
-                  <Maximize2 className="w-3.5 h-3.5" />
+                  <Maximize2 className="w-3.5 h-3.5 text-[#E5C665]" />
                   <span>Bật lại toàn màn hình</span>
                 </button>
               </div>
@@ -1584,7 +1584,7 @@ export function StudentExamView({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Active Question Card */}
-              <div className="lg:col-span-8 bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-6">
+              <div className="lg:col-span-8 bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-6 shadow-2xs">
                 {(() => {
                   const q = selectedExam.questions[currentIdx];
                   if (!q) return null;
@@ -1600,10 +1600,15 @@ export function StudentExamView({
 
                   return (
                     <>
-                      <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#F0EEE8]">
-                        <div className="text-xs font-medium text-[#5C6561]">
-                          Câu {q.index}/{selectedExam.questions.length} · {typeLabel} ·{' '}
-                          <span className="tabular-nums">{q.maxScore} điểm</span>
+                      <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#EDF3F0]">
+                        <div className="text-xs font-medium text-[#4A615A]">
+                          <span className="font-semibold text-[#0F4C3F]">
+                            Câu {q.index}/{selectedExam.questions.length}
+                          </span>{' '}
+                          · {typeLabel} ·{' '}
+                          <span className="tabular-nums text-[#8A630D] font-semibold">
+                            {q.maxScore} điểm
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -1617,8 +1622,8 @@ export function StudentExamView({
                           }}
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer ${
                             isFlagged
-                              ? 'bg-[#FEF3C7] text-[#B45309]'
-                              : 'text-[#66706C] hover:bg-[#F5F4F0]'
+                              ? 'bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D]'
+                              : 'text-[#597169] hover:bg-[#EFF7F3]'
                           }`}
                         >
                           <Flag className="w-3.5 h-3.5" />
@@ -1628,7 +1633,7 @@ export function StudentExamView({
 
                       <MathText
                         text={q.prompt}
-                        className="text-base text-[#16231F] leading-relaxed whitespace-pre-line"
+                        className="text-base text-[#0D221D] leading-relaxed whitespace-pre-line"
                       />
 
                       {q.imageUrls && q.imageUrls.length > 0 && (
@@ -1638,14 +1643,14 @@ export function StudentExamView({
                               key={imgIdx}
                               type="button"
                               onClick={() => setZoomImgUrl(imgUrl)}
-                              className="group relative rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] p-2 hover:border-[#1E4D43] transition-colors cursor-zoom-in"
+                              className="group relative rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] p-2 hover:border-[#0F4C3F] transition-colors cursor-zoom-in"
                             >
                               <img
                                 src={imgUrl}
                                 alt={`Hình minh hoạ câu ${q.index}`}
                                 className="max-h-64 max-w-full rounded-lg object-contain bg-white"
                               />
-                              <span className="block text-[11px] text-[#5C6561] mt-1 group-hover:text-[#1E4D43]">
+                              <span className="block text-[11px] text-[#4A615A] mt-1 group-hover:text-[#0F4C3F]">
                                 Bấm để phóng to hình
                               </span>
                             </button>
@@ -1669,15 +1674,15 @@ export function StudentExamView({
                                 }
                                 className={`w-full text-left px-4 py-3.5 rounded-xl border flex items-center gap-3 text-sm transition-colors cursor-pointer ${
                                   selected
-                                    ? 'border-[#1E4D43] bg-[#F2FBF5] text-[#16231F] font-medium'
-                                    : 'border-[#E7E5DF] bg-white text-[#434D49] hover:bg-[#FAF9F6]'
+                                    ? 'border-[#0F4C3F] bg-[#EFF7F3] text-[#0D221D] font-medium ring-1 ring-[#C89B2B]/40'
+                                    : 'border-[#DAE5E0] bg-white text-[#3A524A] hover:bg-[#F8FAF9]'
                                 }`}
                               >
                                 <span
                                   className={`w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center shrink-0 ${
                                     selected
-                                      ? 'bg-[#1E4D43] text-white'
-                                      : 'bg-[#F0EEE8] text-[#5C6561]'
+                                      ? 'bg-[#0F4C3F] text-[#F7E5A9]'
+                                      : 'bg-[#E6EEEA] text-[#4A615A]'
                                   }`}
                                 >
                                   {OPTION_LETTERS[optIdx]}
@@ -1690,7 +1695,7 @@ export function StudentExamView({
                       )}
 
                       {q.type === 'true_false' && q.statements && (
-                        <div className="divide-y divide-[#ECEAE4] border border-[#E7E5DF] rounded-xl overflow-hidden">
+                        <div className="divide-y divide-[#EBF1EE] border border-[#DAE5E0] rounded-xl overflow-hidden">
                           {q.statements.map((st, sIdx) => {
                             const currentPicks = tfSelections[q.id] || [
                               null,
@@ -1704,7 +1709,7 @@ export function StudentExamView({
                                 key={sIdx}
                                 className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white"
                               >
-                                <div className="text-sm text-[#16231F]">
+                                <div className="text-sm text-[#0D221D]">
                                   <span className="font-semibold mr-1.5">
                                     {TF_LETTERS[sIdx]})
                                   </span>
@@ -1726,10 +1731,10 @@ export function StudentExamView({
                                           [q.id]: nextArr,
                                         }));
                                       }}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
                                         val === btn.bool
-                                          ? 'bg-[#1E4D43] text-white border-[#1E4D43]'
-                                          : 'bg-[#FAF9F6] text-[#434D49] border-[#DCD9D0] hover:bg-[#F0EEE8]'
+                                          ? 'bg-[#0F4C3F] text-white border-[#0F4C3F]'
+                                          : 'bg-[#F8FAF9] text-[#3A524A] border-[#CEDCD6] hover:bg-[#EFF7F3]'
                                       }`}
                                     >
                                       {btn.label}
@@ -1761,12 +1766,12 @@ export function StudentExamView({
                         };
 
                         return (
-                          <div className="p-5 rounded-2xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-3">
+                          <div className="p-5 rounded-2xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <label className="text-xs font-semibold text-[#16231F] uppercase tracking-wider">
+                              <label className="text-xs font-semibold text-[#0D221D] uppercase tracking-wider">
                                 Phiếu điền số (4 ô)
                               </label>
-                              <span className="text-xs text-[#5C6561]">
+                              <span className="text-xs text-[#4A615A]">
                                 Cho phép nhập chữ số{' '}
                                 <span className="font-mono font-semibold">0–9</span>, dấu{' '}
                                 <span className="font-mono font-semibold">-</span> và dấu{' '}
@@ -1852,7 +1857,7 @@ export function StudentExamView({
                                     shortBoxRefs.current[q.id]?.[focusIdx]?.focus();
                                   }}
                                   placeholder="·"
-                                  className="w-14 h-14 rounded-xl border-2 border-[#DCD9D0] bg-white text-center font-mono text-2xl font-bold text-[#16231F] tabular-nums focus:outline-none focus:border-[#1E4D43] focus:ring-2 focus:ring-[#1E4D43]/20 transition-all"
+                                  className="w-14 h-14 rounded-xl border-2 border-[#CEDCD6] bg-white text-center font-mono text-2xl font-bold text-[#0D221D] tabular-nums focus:outline-none focus:border-[#0F4C3F] focus:ring-2 focus:ring-[#C89B2B]/30 transition-all"
                                 />
                               ))}
 
@@ -1860,16 +1865,16 @@ export function StudentExamView({
                                 <button
                                   type="button"
                                   onClick={() => updateBoxes(['', '', '', ''])}
-                                  className="px-2.5 py-1.5 rounded-lg text-xs text-[#66706C] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
+                                  className="px-2.5 py-1.5 rounded-lg text-xs text-[#597169] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
                                 >
                                   Xoá
                                 </button>
                               )}
                             </div>
 
-                            <div className="text-xs text-[#434D49] tabular-nums">
+                            <div className="text-xs text-[#3A524A] tabular-nums">
                               Đáp số đã điền:{' '}
-                              <strong className="font-mono text-sm text-[#1E4D43]">
+                              <strong className="font-mono text-sm text-[#0F4C3F]">
                                 {joinedVal || '(chưa điền)'}
                               </strong>
                             </div>
@@ -1880,7 +1885,7 @@ export function StudentExamView({
                       {q.type === 'essay' && (
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-medium text-[#5C6561] mb-1.5">
+                            <label className="block text-xs font-medium text-[#4A615A] mb-1.5">
                               Bài làm tự luận của bạn
                             </label>
                             <textarea
@@ -1893,11 +1898,11 @@ export function StudentExamView({
                                 }))
                               }
                               placeholder="Trình bày lời giải chi tiết (hỗ trợ $công thức$ LaTeX) hoặc chụp ảnh vở làm bài bên dưới..."
-                              className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm focus:outline-none focus:border-[#1E4D43]"
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                             />
                             {containsLatexFormula(shortAnswers[q.id]) && (
-                              <div className="mt-2 p-2.5 rounded-lg bg-white border border-[#E7E5DF] text-xs text-[#16231F]">
-                                <div className="text-[10px] font-semibold uppercase tracking-wider text-[#1E4D43] mb-1">
+                              <div className="mt-2 p-2.5 rounded-lg bg-white border border-[#DAE5E0] text-xs text-[#0D221D]">
+                                <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0F4C3F] mb-1">
                                   Xem trước công thức đã nhập
                                 </div>
                                 <MathText
@@ -1908,21 +1913,21 @@ export function StudentExamView({
                             )}
                           </div>
 
-                          <div className="p-3.5 rounded-xl border border-dashed border-[#D3CFC4] bg-[#FAF9F6] space-y-2.5">
+                          <div className="p-3.5 rounded-xl border border-dashed border-[#CEDCD6] bg-[#F8FAF9] space-y-2.5">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="space-y-0.5">
-                                <span className="text-xs text-[#5C6561] block">
+                                <span className="text-xs text-[#4A615A] block">
                                   Chụp / tải ảnh bài giải viết tay (AI chấm theo barem: công thức, thay số, đáp số, đơn vị)
                                 </span>
-                                <span className="text-[11px] text-[#1E4D43] font-medium block">
+                                <span className="text-[11px] text-[#0F4C3F] font-medium block">
                                   Ảnh được nén tự động gọn nhẹ (~70 KB/ảnh) tránh tràn dung lượng và miễn ghi nhận thoát màn hình khi mở camera.
                                 </span>
                               </div>
                               <label
                                 onClick={beginPhotoCaptureExemption}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#DCD9D0] text-xs font-medium text-[#1E4D43] hover:bg-[#E5ECE7] cursor-pointer shrink-0"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#CEDCD6] text-xs font-semibold text-[#0F4C3F] hover:bg-[#EFF7F3] cursor-pointer shrink-0"
                               >
-                                <Camera className="w-3.5 h-3.5" />
+                                <Camera className="w-3.5 h-3.5 text-[#C89B2B]" />
                                 <span>
                                   {shortAnswerImages[q.id] ? 'Đổi ảnh bài làm' : 'Chụp / chọn ảnh'}
                                 </span>
@@ -1964,7 +1969,7 @@ export function StudentExamView({
                                 <img
                                   src={shortAnswerImages[q.id]}
                                   alt="Ảnh bài làm đã chọn"
-                                  className="max-h-40 rounded-lg border border-[#DCD9D0] bg-white object-contain"
+                                  className="max-h-40 rounded-lg border border-[#CEDCD6] bg-white object-contain"
                                 />
                                 <button
                                   type="button"
@@ -1991,12 +1996,12 @@ export function StudentExamView({
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between pt-4 border-t border-[#F0EEE8]">
+                      <div className="flex items-center justify-between pt-4 border-t border-[#EDF3F0]">
                         <button
                           type="button"
                           disabled={currentIdx === 0}
                           onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
-                          className="px-4 py-2 rounded-xl border border-[#DCD9D0] text-sm font-medium text-[#434D49] hover:bg-[#FAF9F6] disabled:opacity-40 cursor-pointer"
+                          className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#EFF7F3] disabled:opacity-40 cursor-pointer"
                         >
                           Câu trước
                         </button>
@@ -2008,7 +2013,7 @@ export function StudentExamView({
                               Math.min(selectedExam.questions.length - 1, i + 1)
                             )
                           }
-                          className="px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] disabled:opacity-40 cursor-pointer"
+                          className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] disabled:opacity-40 cursor-pointer"
                         >
                           Câu tiếp theo
                         </button>
@@ -2019,12 +2024,12 @@ export function StudentExamView({
               </div>
 
               {/* Question Palette Sidebar */}
-              <aside className="lg:col-span-4 bg-white border border-[#E7E5DF] rounded-2xl p-5 space-y-5 lg:sticky lg:top-20">
+              <aside className="lg:col-span-4 bg-white border border-[#DAE5E0] rounded-2xl p-5 space-y-5 lg:sticky lg:top-20 shadow-2xs">
                 <div>
-                  <div className="text-sm font-semibold text-[#16231F]">
+                  <div className="text-sm font-semibold text-[#0D221D]">
                     {studentName}
                   </div>
-                  <div className="text-xs text-[#66706C] mt-0.5">
+                  <div className="text-xs text-[#597169] mt-0.5">
                     {verifiedStudent ? `Mã HS: ${verifiedStudent.studentCode} · ` : ''}
                     Lớp {className || '—'} · {selectedExam.title}
                   </div>
@@ -2049,12 +2054,12 @@ export function StudentExamView({
                         onClick={() => setCurrentIdx(idx)}
                         className={`h-9 rounded-lg text-xs font-semibold tabular-nums border transition-colors cursor-pointer ${
                           isCurrent
-                            ? 'border-[#1E4D43] ring-2 ring-[#1E4D43]/25 bg-[#1E4D43] text-white'
+                            ? 'border-[#0F4C3F] ring-2 ring-[#C89B2B]/45 bg-[#0F4C3F] text-[#F7E5A9]'
                             : isFlagged
-                              ? 'border-[#D98218] bg-[#FEF3C7] text-[#92400E]'
+                              ? 'border-[#C89B2B] bg-[#FDF8EB] text-[#8A630D]'
                               : isAnswered
-                                ? 'border-[#A7D7BA] bg-[#E5ECE7] text-[#1E4D43]'
-                                : 'border-[#E7E5DF] bg-[#FAF9F6] text-[#5C6561]'
+                                ? 'border-[#C5DDD3] bg-[#EFF7F3] text-[#0F4C3F]'
+                                : 'border-[#DAE5E0] bg-[#F8FAF9] text-[#4A615A]'
                         }`}
                       >
                         {q.index}
@@ -2067,9 +2072,9 @@ export function StudentExamView({
                   type="button"
                   disabled={submitting}
                   onClick={() => handleSubmitExam()}
-                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors disabled:opacity-60 cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] transition-colors disabled:opacity-60 cursor-pointer shadow-xs"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 text-[#E5C665]" />
                   <span>{submitting ? submittingNote || 'Đang nộp bài...' : 'Nộp bài ngay'}</span>
                 </button>
               </aside>
@@ -2079,23 +2084,23 @@ export function StudentExamView({
 
         {/* VIOLATION WARNING MODAL (EXITS 1..3) */}
         {phase === 'taking' && showViolationModal && (
-          <div className="fixed inset-0 z-50 bg-[#16231F]/65 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white border border-[#E7E5DF] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+          <div className="fixed inset-0 z-50 bg-[#082B23]/65 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white border border-[#DAE5E0] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#FEF3C7] text-[#B45309] flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] flex items-center justify-center shrink-0">
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h2 className="font-serif text-xl font-semibold text-[#16231F]">
+                  <h2 className="font-serif text-xl font-semibold text-[#0D221D]">
                     Cảnh báo rời màn hình thi
                   </h2>
-                  <div className="text-xs font-semibold text-[#B45309] tabular-nums">
+                  <div className="text-xs font-semibold text-[#8A630D] tabular-nums">
                     Lần thoát thứ {violationCount}/{MAX_ALLOWED_EXITS}
                   </div>
                 </div>
               </div>
 
-              <p className="text-sm text-[#434D49] leading-relaxed">
+              <p className="text-sm text-[#3A524A] leading-relaxed">
                 {violationCount >= MAX_ALLOWED_EXITS ? (
                   <>
                     Bạn đã sử dụng hết{' '}
@@ -2112,7 +2117,7 @@ export function StudentExamView({
                   <>
                     Hệ thống đã ghi nhận bạn thoát chế độ toàn màn hình hoặc chuyển
                     cửa sổ. Bạn chỉ còn{' '}
-                    <strong className="text-[#16231F] tabular-nums">
+                    <strong className="text-[#0D221D] tabular-nums">
                       {MAX_ALLOWED_EXITS - violationCount} lần
                     </strong>{' '}
                     cảnh báo — thoát quá {MAX_ALLOWED_EXITS} lần sẽ bị ép buộc nộp
@@ -2127,9 +2132,9 @@ export function StudentExamView({
                   await enterFullscreen();
                   setShowViolationModal(false);
                 }}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] cursor-pointer"
               >
-                <Maximize2 className="w-4 h-4" />
+                <Maximize2 className="w-4 h-4 text-[#E5C665]" />
                 <span>Quay lại toàn màn hình &amp; tiếp tục làm bài</span>
               </button>
             </div>
@@ -2182,13 +2187,13 @@ export function StudentExamView({
                   isWrong
                     ? 'border-[#FCA5A5]'
                     : isPerfect
-                      ? 'border-[#BBF7D0]'
-                      : 'border-[#E7E5DF]'
+                      ? 'border-[#C5DDD3]'
+                      : 'border-[#DAE5E0]'
                 }`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5C6561]">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#4A615A]">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-[#16231F]">
+                    <span className="font-semibold text-[#0D221D]">
                       Câu {q.index} · {typeLabel}
                     </span>
                     <span>
@@ -2204,30 +2209,30 @@ export function StudentExamView({
                       </span>
                     )}
                     {isPerfect && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F0FDF4] text-[#15803D] font-semibold">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F0FBF6] text-[#0F6D4F] font-semibold">
                         <CheckCircle2 className="w-3 h-3" />
                         <span>{q.type === 'essay' ? 'Đạt tối đa (AI chấm barem)' : 'Đúng'}</span>
                       </span>
                     )}
                     {q.type === 'essay' && !essayGradedByAi && (
-                      <span className="px-2 py-0.5 rounded-md bg-[#FAF6ED] text-[#8B641E] font-semibold">
+                      <span className="px-2 py-0.5 rounded-md bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] font-semibold">
                         Chờ giáo viên chấm tự luận
                       </span>
                     )}
                     {essayGradedByAi && !isPerfect && (
-                      <span className="px-2 py-0.5 rounded-md bg-[#EEF5F1] text-[#1E4D43] font-semibold">
+                      <span className="px-2 py-0.5 rounded-md bg-[#EFF7F3] text-[#0F4C3F] font-semibold">
                         AI đã chấm theo barem (GV có thể điều chỉnh)
                       </span>
                     )}
                   </div>
-                  <span className="font-semibold text-[#16231F] tabular-nums">
+                  <span className="font-semibold text-[#0D221D] tabular-nums">
                     {formatScore(ans?.score || 0)} / {q.maxScore} điểm
                   </span>
                 </div>
 
                 <MathText
                   text={q.prompt}
-                  className="text-sm text-[#16231F] whitespace-pre-line leading-relaxed"
+                  className="text-sm text-[#0D221D] whitespace-pre-line leading-relaxed"
                 />
 
                 {q.imageUrls && q.imageUrls.length > 0 && (
@@ -2238,7 +2243,7 @@ export function StudentExamView({
                         src={url}
                         alt={`Hình câu ${q.index}`}
                         onClick={() => setZoomImgUrl(url)}
-                        className="max-h-44 rounded-lg border border-[#DCD9D0] object-contain bg-white cursor-zoom-in"
+                        className="max-h-44 rounded-lg border border-[#CEDCD6] object-contain bg-white cursor-zoom-in"
                       />
                     ))}
                   </div>
@@ -2250,9 +2255,9 @@ export function StudentExamView({
                     {q.options.map((opt, optIdx) => {
                       const picked = ans?.selectedOption === optIdx;
                       const isKey = q.correctOption === optIdx;
-                      let cls = 'border-[#E7E5DF] bg-[#FAF9F6] text-[#434D49]';
+                      let cls = 'border-[#DAE5E0] bg-[#F8FAF9] text-[#3A524A]';
                       if (isKey) {
-                        cls = 'border-[#16A34A] bg-[#F0FDF4] text-[#14532D] font-semibold';
+                        cls = 'border-[#0F6D4F] bg-[#F0FBF6] text-[#0A362C] font-semibold';
                       } else if (picked && !isKey) {
                         cls = 'border-[#DC2626] bg-[#FEF2F2] text-[#991B1B] font-semibold';
                       }
@@ -2268,7 +2273,7 @@ export function StudentExamView({
                             <MathText text={opt} className="leading-relaxed" inline />
                           </div>
                           {isKey && (
-                            <span className="text-[10px] uppercase tracking-wider shrink-0 text-[#15803D]">
+                            <span className="text-[10px] uppercase tracking-wider shrink-0 text-[#0F6D4F]">
                               Đáp án đúng
                             </span>
                           )}
@@ -2294,7 +2299,7 @@ export function StudentExamView({
                           key={sIdx}
                           className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                             right
-                              ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#14532D]'
+                              ? 'border-[#C5DDD3] bg-[#F0FBF6] text-[#0A362C]'
                               : 'border-[#FECACA] bg-[#FEF2F2] text-[#7F1D1D]'
                           }`}
                         >
@@ -2323,12 +2328,12 @@ export function StudentExamView({
 
                 {/* Short Answer breakdown */}
                 {q.type === 'short_answer' && (
-                  <div className="text-xs text-[#434D49] flex flex-wrap gap-4">
+                  <div className="text-xs text-[#3A524A] flex flex-wrap gap-4">
                     <span>
                       Bạn điền:{' '}
                       <strong
                         className={`font-mono ${
-                          isWrong ? 'text-[#B91C1C]' : 'text-[#15803D]'
+                          isWrong ? 'text-[#B91C1C]' : 'text-[#0F6D4F]'
                         }`}
                       >
                         {ans?.textAnswer || '(bỏ trống)'}
@@ -2337,7 +2342,7 @@ export function StudentExamView({
                     {q.correctAnswer && (
                       <span>
                         Đáp số chuẩn:{' '}
-                        <strong className="font-mono text-[#1E4D43]">
+                        <strong className="font-mono text-[#0F4C3F]">
                           <MathText text={q.correctAnswer} inline />
                         </strong>
                       </span>
@@ -2347,9 +2352,9 @@ export function StudentExamView({
 
                 {/* Essay student response & AI Barem breakdown */}
                 {q.type === 'essay' && (
-                  <div className="space-y-2.5 text-xs text-[#434D49]">
+                  <div className="space-y-2.5 text-xs text-[#3A524A]">
                     <div>
-                      <span className="font-semibold text-[#16231F]">Bài làm của bạn: </span>
+                      <span className="font-semibold text-[#0D221D]">Bài làm của bạn: </span>
                       <span>{ans?.textAnswer?.trim() || '(Chưa nhập chữ)'}</span>
                     </div>
                     {ans?.imageDataUrl && (
@@ -2357,23 +2362,23 @@ export function StudentExamView({
                         src={ans.imageDataUrl}
                         alt={`Ảnh bài tự luận câu ${q.index}`}
                         onClick={() => setZoomImgUrl(ans.imageDataUrl!)}
-                        className="max-h-40 rounded-lg border border-[#DCD9D0] object-contain bg-white cursor-zoom-in"
+                        className="max-h-40 rounded-lg border border-[#CEDCD6] object-contain bg-white cursor-zoom-in"
                       />
                     )}
                     {ans?.recognizedText && (
-                      <div className="p-3 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-1">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#66706C]">
+                      <div className="p-3 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-1">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#597169]">
                           Nội dung AI đọc được từ bài làm / ảnh chụp
                         </div>
                         <MathText
                           text={ans.recognizedText}
-                          className="text-xs text-[#16231F] whitespace-pre-line leading-relaxed"
+                          className="text-xs text-[#0D221D] whitespace-pre-line leading-relaxed"
                         />
                       </div>
                     )}
                     {ans?.aiBreakdown && ans.aiBreakdown.length > 0 && (
-                      <div className="p-3 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-1.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#1E4D43]">
+                      <div className="p-3 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#0F4C3F]">
                           Chấm theo Barem 4 bước (Công thức · Thay số · Đáp số · Đơn vị)
                         </div>
                         {ans.aiBreakdown.map((b, bIdx) => (
@@ -2381,15 +2386,15 @@ export function StudentExamView({
                             key={bIdx}
                             className="flex items-start justify-between gap-2 text-xs"
                           >
-                            <div className="flex items-start gap-1.5 text-[#16231F]">
+                            <div className="flex items-start gap-1.5 text-[#0D221D]">
                               {b.met ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />
+                                <CheckCircle2 className="w-3.5 h-3.5 text-[#0F6D4F] shrink-0 mt-0.5" />
                               ) : (
                                 <XCircle className="w-3.5 h-3.5 text-[#DC2626] shrink-0 mt-0.5" />
                               )}
                               <MathText text={b.criterion} inline />
                             </div>
-                            <span className="font-mono font-semibold tabular-nums shrink-0 text-[#16231F]">
+                            <span className="font-mono font-semibold tabular-nums shrink-0 text-[#0D221D]">
                               {b.score}/{b.maxScore}
                             </span>
                           </div>
@@ -2397,7 +2402,7 @@ export function StudentExamView({
                       </div>
                     )}
                     {ans?.aiFeedback && (
-                      <div className="p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
+                      <div className="p-3 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-xs text-[#7A580B]">
                         <span className="font-semibold">Nhận xét chấm barem AI: </span>
                         <MathText text={ans.aiFeedback} inline />
                       </div>
@@ -2407,8 +2412,8 @@ export function StudentExamView({
 
                 {(q.explanation ||
                   (q.explanationImageUrls && q.explanationImageUrls.length > 0)) && (
-                  <div className="p-3.5 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] text-xs text-[#1F3A2B] space-y-2">
-                    <div className="uppercase tracking-wider font-bold text-[#1E7E48]">
+                  <div className="p-3.5 rounded-xl bg-[#F0FBF6] border border-[#C5DDD3] text-xs text-[#0D221D] space-y-2">
+                    <div className="uppercase tracking-wider font-bold text-[#0F6D4F]">
                       {q.type === 'essay' ? 'Hướng dẫn giải:' : 'Lời giải:'}
                     </div>
                     {q.explanation && (
@@ -2425,7 +2430,7 @@ export function StudentExamView({
                             src={u}
                             alt={`Hướng dẫn giải câu ${q.index}`}
                             onClick={() => setZoomImgUrl(u)}
-                            className="max-h-44 rounded-lg border border-[#BBF7D0] object-contain bg-white cursor-zoom-in"
+                            className="max-h-44 rounded-lg border border-[#C5DDD3] object-contain bg-white cursor-zoom-in"
                           />
                         ))}
                       </div>
@@ -2455,13 +2460,14 @@ export function StudentExamView({
                 </div>
               )}
 
-              <div className="bg-white border border-[#E7E5DF] rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              {/* Result Score Hero Card — Jade & Champagne Gold Highlight */}
+              <div className="bg-gradient-to-br from-white via-white to-[#FDF8EB] border border-[#EAD8A6] rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-xs">
                 <div className="space-y-1.5">
                   <div
                     className={`inline-flex items-center gap-1.5 text-xs font-semibold uppercase ${
                       submittedResult.violationCount > MAX_ALLOWED_EXITS
                         ? 'text-[#B91C1C]'
-                        : 'text-[#1E4D43]'
+                        : 'text-[#8A630D]'
                     }`}
                   >
                     {submittedResult.violationCount > MAX_ALLOWED_EXITS ? (
@@ -2471,15 +2477,15 @@ export function StudentExamView({
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-4 h-4 text-[#0F6D4F]" />
                         <span>Đã nộp bài thành công</span>
                       </>
                     )}
                   </div>
-                  <h1 className="font-serif text-3xl font-semibold text-[#16231F]">
+                  <h1 className="font-serif text-3xl font-semibold text-[#0D221D]">
                     {submittedResult.studentName}
                   </h1>
-                  <p className="text-sm text-[#5C6561] tabular-nums">
+                  <p className="text-sm text-[#4A615A] tabular-nums">
                     {submittedResult.studentCode ? `Mã HS: ${submittedResult.studentCode} · ` : ''}
                     {submittedResult.className ? `Lớp ${submittedResult.className} · ` : ''}
                     {submittedResult.examTitle} · Thời gian làm:{' '}
@@ -2491,15 +2497,17 @@ export function StudentExamView({
                 </div>
 
                 <div className="text-left sm:text-right shrink-0">
-                  <div className="text-xs text-[#66706C]">Điểm tạm tính</div>
-                  <div className="font-serif text-4xl font-semibold text-[#1E4D43] tabular-nums">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#8A630D]">
+                    Điểm tạm tính
+                  </div>
+                  <div className="font-serif text-4xl font-semibold text-[#0F4C3F] tabular-nums">
                     {formatScore(submittedResult.totalScore)}/
                     {formatScore(submittedResult.maxScore)}
                   </div>
                   <button
                     type="button"
                     onClick={() => setPhase('setup')}
-                    className="mt-2 text-xs font-medium text-[#1E4D43] hover:underline cursor-pointer"
+                    className="mt-2 text-xs font-semibold text-[#0F4C3F] hover:text-[#8A630D] hover:underline cursor-pointer"
                   >
                     Làm lại đề khác
                   </button>
@@ -2546,18 +2554,18 @@ export function StudentExamView({
                 ).length;
 
                 return (
-                  <section className="bg-white border border-[#E7E5DF] rounded-2xl p-5 sm:p-6 space-y-4">
+                  <section className="bg-white border border-[#DAE5E0] rounded-2xl p-5 sm:p-6 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[#1E4D43]" />
-                        <h2 className="font-serif text-xl font-semibold text-[#16231F]">
+                        <Sparkles className="w-4 h-4 text-[#C89B2B]" />
+                        <h2 className="font-serif text-xl font-semibold text-[#0D221D]">
                           Phân tích &amp; Nhận xét bài làm của bạn
                         </h2>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-[#5C6561] tabular-nums">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-[#4A615A] tabular-nums">
                         <span>Tốc độ TB: {avgSecPerQ}s/câu</span>
                         {rushedCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-md bg-[#FEF3C7] text-[#92400E] font-semibold">
+                          <span className="px-2 py-0.5 rounded-md bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] font-semibold">
                             {rushedCount} câu chọn nhanh (&lt;5s)
                           </span>
                         )}
@@ -2569,12 +2577,12 @@ export function StudentExamView({
                       {typeStats.map((st) => (
                         <div
                           key={st.key}
-                          className="p-3 rounded-xl bg-[#FAF9F6] border border-[#ECEAE4]"
+                          className="p-3 rounded-xl bg-[#F8FAF9] border border-[#EBF1EE]"
                         >
-                          <div className="text-[11px] font-medium text-[#66706C]">
+                          <div className="text-[11px] font-medium text-[#597169]">
                             {st.label} ({st.count} câu)
                           </div>
-                          <div className="font-serif text-lg font-semibold text-[#16231F] mt-0.5 tabular-nums">
+                          <div className="font-serif text-lg font-semibold text-[#0D221D] mt-0.5 tabular-nums">
                             {formatScore(st.earned)}/{formatScore(st.max)} đ
                           </div>
                         </div>
@@ -2583,7 +2591,7 @@ export function StudentExamView({
 
                     {/* AI Personalized Commentary */}
                     {reviewLoading ? (
-                      <div className="p-4 rounded-xl bg-[#EEF5F1] border border-[#CFE0D7] flex items-center gap-3 text-xs text-[#1E4D43]">
+                      <div className="p-4 rounded-xl bg-[#EFF7F3] border border-[#DCECE4] flex items-center gap-3 text-xs text-[#0F4C3F]">
                         <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                         <span>AI đang phân tích chi tiết bài làm và viết nhận xét cho bạn...</span>
                       </div>
@@ -2608,20 +2616,20 @@ export function StudentExamView({
                       </div>
                     ) : studentReview ? (
                       <div className="space-y-3 text-xs sm:text-sm">
-                        <div className="p-3.5 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] text-[#16231F] leading-relaxed">
+                        <div className="p-3.5 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] text-[#0D221D] leading-relaxed">
                           <MathText text={studentReview.overallComment} className="leading-relaxed" />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                          <div className="p-3.5 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] text-[#1F3A2B] space-y-1">
-                            <div className="font-bold uppercase tracking-wider text-[#1E7E48]">
+                          <div className="p-3.5 rounded-xl bg-[#F0FBF6] border border-[#C5DDD3] text-[#0D221D] space-y-1">
+                            <div className="font-bold uppercase tracking-wider text-[#0F6D4F]">
                               Điểm làm tốt
                             </div>
                             <MathText text={studentReview.strengths} className="leading-relaxed" />
                           </div>
 
-                          <div className="p-3.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] space-y-1">
-                            <div className="font-bold uppercase tracking-wider text-[#B45309]">
+                          <div className="p-3.5 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-[#7A580B] space-y-1">
+                            <div className="font-bold uppercase tracking-wider text-[#8A630D]">
                               Lỗi cần khắc phục
                             </div>
                             <MathText text={studentReview.weaknesses} className="leading-relaxed" />
@@ -2629,13 +2637,13 @@ export function StudentExamView({
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                          <div className="p-3 rounded-xl bg-[#FAF9F6] border border-[#ECEAE4] text-[#434D49] space-y-1">
-                            <div className="font-semibold text-[#16231F]">Nhịp độ làm bài</div>
+                          <div className="p-3 rounded-xl bg-[#F8FAF9] border border-[#EBF1EE] text-[#3A524A] space-y-1">
+                            <div className="font-semibold text-[#0D221D]">Nhịp độ làm bài</div>
                             <MathText text={studentReview.pacingNote} className="leading-relaxed" />
                           </div>
 
-                          <div className="p-3 rounded-xl bg-[#EEF5F1] border border-[#CFE0D7] text-[#16231F] space-y-1">
-                            <div className="font-semibold text-[#1E4D43]">Gợi ý ôn tập ngay</div>
+                          <div className="p-3 rounded-xl bg-[#EFF7F3] border border-[#DCECE4] text-[#0D221D] space-y-1">
+                            <div className="font-semibold text-[#0F4C3F]">Gợi ý ôn tập ngay</div>
                             <MathText text={studentReview.studyPlan} className="leading-relaxed" />
                           </div>
                         </div>
@@ -2646,7 +2654,7 @@ export function StudentExamView({
               })()}
 
               {/* Navigation Tabs for Post-Exam Review & AI Practice */}
-              <div className="flex flex-wrap items-center gap-2 border-b border-[#E7E5DF] pb-3">
+              <div className="flex flex-wrap items-center gap-2 border-b border-[#DAE5E0] pb-3">
                 {wrongEntries.length > 0 && (
                   <button
                     type="button"
@@ -2654,7 +2662,7 @@ export function StudentExamView({
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
                       resultTab === 'wrong_review'
                         ? 'bg-[#B91C1C] text-white'
-                        : 'bg-white border border-[#E7E5DF] text-[#991B1B] hover:bg-[#FEF2F2]'
+                        : 'bg-white border border-[#DAE5E0] text-[#991B1B] hover:bg-[#FEF2F2]'
                     }`}
                   >
                     <XCircle className="w-4 h-4" />
@@ -2677,14 +2685,14 @@ export function StudentExamView({
                   }}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
                     resultTab === 'ai_practice'
-                      ? 'bg-[#1E4D43] text-white'
-                      : 'bg-white border border-[#E7E5DF] text-[#1E4D43] hover:bg-[#EEF5F1]'
+                      ? 'bg-[#0F4C3F] text-white'
+                      : 'bg-white border border-[#DAE5E0] text-[#0F4C3F] hover:bg-[#EFF7F3]'
                   }`}
                 >
                   {practiceLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin text-[#E5C665]" />
                   ) : (
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4 text-[#C89B2B]" />
                   )}
                   <span>
                     Luyện câu ôn tập AI
@@ -2699,8 +2707,8 @@ export function StudentExamView({
                   onClick={() => setResultTab('all')}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
                     resultTab === 'all'
-                      ? 'bg-[#16231F] text-white'
-                      : 'bg-white border border-[#E7E5DF] text-[#434D49] hover:bg-[#F5F4F0]'
+                      ? 'bg-[#0A362C] text-[#F7E5A9]'
+                      : 'bg-white border border-[#DAE5E0] text-[#3A524A] hover:bg-[#EFF7F3]'
                   }`}
                 >
                   <BookOpen className="w-4 h-4" />
@@ -2722,24 +2730,24 @@ export function StudentExamView({
               ) : (
                 <div className="space-y-4">
                   {resultTab === 'wrong_review' && wrongEntries.length > 0 && (
-                    <div className="bg-[#EEF5F1] border border-[#CFE0D7] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="bg-gradient-to-r from-[#EFF7F3] to-[#FDF8EB] border border-[#DCECE4] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
-                        <div className="text-sm font-semibold text-[#16231F]">
+                        <div className="text-sm font-semibold text-[#0D221D]">
                           Bạn có {wrongEntries.length} câu làm sai hoặc chưa đủ điểm tối đa
                         </div>
-                        <p className="text-xs text-[#434D49] leading-relaxed">
+                        <p className="text-xs text-[#3A524A] leading-relaxed">
                           Xem lại đáp án đúng và lời giải chi tiết ở bên dưới, sau đó chuyển sang phần AI luyện câu tương tự để củng cố ngay kiến thức vừa hổng.
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setResultTab('ai_practice')}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E4D43] text-white text-xs font-semibold hover:bg-[#163B33] shrink-0 cursor-pointer"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] shrink-0 cursor-pointer shadow-xs"
                       >
                         {practiceLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin text-[#E5C665]" />
                         ) : (
-                          <Sparkles className="w-4 h-4" />
+                          <Sparkles className="w-4 h-4 text-[#E5C665]" />
                         )}
                         <span>
                           {practiceLoading
@@ -2761,7 +2769,7 @@ export function StudentExamView({
       {zoomImgUrl && (
         <div
           onClick={() => setZoomImgUrl(null)}
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+          className="fixed inset-0 z-50 bg-[#082B23]/85 flex items-center justify-center p-4 cursor-zoom-out"
         >
           <img
             src={zoomImgUrl}

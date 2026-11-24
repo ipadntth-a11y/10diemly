@@ -8,16 +8,21 @@
 
 @layer base {
   html {
-    background-color: #faf9f6;
-    color: #16231f;
+    background-color: #f6f8f7;
+    color: #0d221d;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
 
   body {
-    background-color: #faf9f6;
-    color: #16231f;
+    background-color: #f6f8f7;
+    color: #0d221d;
     margin: 0;
+  }
+
+  ::selection {
+    background-color: #eedb9f;
+    color: #093027;
   }
 
   .tabular-nums {
@@ -36,4 +41,3 @@
   overflow-y: hidden;
   padding-bottom: 2px;
 }
-

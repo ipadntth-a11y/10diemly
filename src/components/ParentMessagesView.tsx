@@ -92,13 +92,13 @@ export function ParentMessagesView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="text-xs font-medium tracking-[0.08em] text-[#66706C] uppercase">
+          <div className="text-xs font-semibold tracking-[0.08em] text-[#8A630D] uppercase">
             Liên lạc gia đình
           </div>
-          <h1 className="font-serif text-3xl font-semibold text-[#16231F] mt-1">
+          <h1 className="font-serif text-3xl font-semibold text-[#0D221D] mt-1">
             Tin nhắn phụ huynh
           </h1>
-          <p className="text-sm text-[#5C6561] mt-1">
+          <p className="text-sm text-[#4A615A] mt-1">
             Soạn nhanh báo cáo kết quả học tập, sao chép gửi Zalo/SMS và theo dõi trạng thái.
           </p>
         </div>
@@ -108,7 +108,7 @@ export function ParentMessagesView({
             <select
               value={selectedBatchExamId || exams[0]?.id || ''}
               onChange={(e) => setSelectedBatchExamId(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-[#DCD9D0] bg-white text-xs font-medium text-[#16231F] max-w-56 truncate"
+              className="px-3 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] max-w-56 truncate focus:outline-none focus:border-[#0F4C3F]"
             >
               {exams.map((ex) => (
                 <option key={ex.id} value={ex.id}>
@@ -120,9 +120,9 @@ export function ParentMessagesView({
               type="button"
               disabled={batchGenerating}
               onClick={handleBatchGenerate}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-xs font-medium hover:bg-[#163B33] disabled:opacity-60 whitespace-nowrap cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] disabled:opacity-60 whitespace-nowrap shrink-0 cursor-pointer shadow-xs"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 text-[#E5C665]" />
               <span>
                 {batchGenerating ? 'Đang tạo...' : 'Tạo tin từ bài nộp'}
               </span>
@@ -133,7 +133,7 @@ export function ParentMessagesView({
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1 p-1 bg-[#F0EEE8] rounded-xl self-start">
+        <div className="inline-flex items-center gap-1 p-1 bg-[#E6EEEA] rounded-xl self-start">
           {[
             { id: 'all' as const, label: `Tất cả (${messages.length})` },
             {
@@ -151,8 +151,8 @@ export function ParentMessagesView({
               onClick={() => setFilterStatus(tab.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
                 filterStatus === tab.id
-                  ? 'bg-white text-[#1E4D43] shadow-sm'
-                  : 'text-[#5C6561] hover:text-[#16231F]'
+                  ? 'bg-white text-[#0F4C3F] font-semibold shadow-sm'
+                  : 'text-[#4A615A] hover:text-[#0D221D]'
               }`}
             >
               {tab.label}
@@ -161,25 +161,25 @@ export function ParentMessagesView({
         </div>
 
         <div className="relative">
-          <Search className="w-4 h-4 text-[#7C8581] absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-[#698078] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm học sinh, SĐT, đề..."
-            className="pl-9 pr-3.5 py-2 rounded-xl border border-[#DCD9D0] bg-white text-sm focus:outline-none focus:border-[#1E4D43] w-full sm:w-64"
+            className="pl-9 pr-3.5 py-2 rounded-xl border border-[#CEDCD6] bg-white text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F] w-full sm:w-64"
           />
         </div>
       </div>
 
       {/* Message Cards */}
       {filteredMessages.length === 0 ? (
-        <div className="bg-white border border-[#E7E5DF] rounded-2xl p-12 text-center space-y-3">
-          <MessageSquare className="w-8 h-8 text-[#7C8581] mx-auto" />
-          <h2 className="font-serif text-xl font-semibold text-[#16231F]">
+        <div className="bg-white border border-[#DAE5E0] rounded-2xl p-12 text-center space-y-3">
+          <MessageSquare className="w-8 h-8 text-[#698078] mx-auto" />
+          <h2 className="font-serif text-xl font-semibold text-[#0D221D]">
             Chưa có tin nhắn nào
           </h2>
-          <p className="text-sm text-[#5C6561] max-w-md mx-auto">
+          <p className="text-sm text-[#4A615A] max-w-md mx-auto">
             Nhấn &ldquo;Tạo tin từ bài nộp&rdquo; ở góc trên hoặc lưu tin nhắn trực tiếp từ trang chấm bài học sinh.
           </p>
         </div>
@@ -188,15 +188,15 @@ export function ParentMessagesView({
           {filteredMessages.map((msg) => (
             <article
               key={msg.id}
-              className="bg-white border border-[#E7E5DF] rounded-2xl p-5 flex flex-col justify-between gap-4"
+              className="bg-white border border-[#DAE5E0] rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-2xs"
             >
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-base text-[#16231F] truncate">
+                    <h3 className="font-semibold text-base text-[#0D221D] truncate">
                       {msg.studentName}
                     </h3>
-                    <div className="text-xs text-[#66706C] flex flex-wrap items-center gap-1.5 mt-0.5">
+                    <div className="text-xs text-[#597169] flex flex-wrap items-center gap-1.5 mt-0.5">
                       <span>{msg.className ? `Lớp ${msg.className}` : 'Học sinh'}</span>
                       <span aria-hidden="true">·</span>
                       <span className="truncate">{msg.examTitle}</span>
@@ -204,10 +204,10 @@ export function ParentMessagesView({
                   </div>
 
                   <span
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium shrink-0 ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 border ${
                       msg.status === 'sent'
-                        ? 'bg-[#E5ECE7] text-[#1E4D43]'
-                        : 'bg-[#FEF3C7] text-[#92400E]'
+                        ? 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0F4C3F]'
+                        : 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D]'
                     }`}
                   >
                     {msg.status === 'sent' ? 'Đã gửi' : 'Chờ gửi'}
@@ -215,7 +215,7 @@ export function ParentMessagesView({
                 </div>
 
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-[#66706C] shrink-0">SĐT:</span>
+                  <span className="text-[#597169] shrink-0">SĐT:</span>
                   <input
                     type="text"
                     defaultValue={msg.parentPhone}
@@ -227,7 +227,7 @@ export function ParentMessagesView({
                       }
                     }}
                     placeholder="chưa có SĐT"
-                    className="flex-1 px-2.5 py-1 rounded-lg border border-[#ECEAE4] bg-[#FAF9F6] font-mono text-xs text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                    className="flex-1 px-2.5 py-1 rounded-lg border border-[#EBF1EE] bg-[#F8FAF9] font-mono text-xs text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
 
@@ -239,20 +239,20 @@ export function ParentMessagesView({
                       updateParentMessageStatus(msg.id, { content: e.target.value });
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl border border-[#ECEAE4] bg-[#FAF9F6] text-xs text-[#434D49] leading-relaxed focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3 py-2 rounded-xl border border-[#EBF1EE] bg-[#F8FAF9] text-xs text-[#3A524A] leading-relaxed focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#F0EEE8]">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#EDF3F0]">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleCopy(msg)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#DCD9D0] bg-white text-xs font-medium text-[#16231F] hover:bg-[#FAF9F6] cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] hover:bg-[#F8FAF9] whitespace-nowrap cursor-pointer"
                   >
                     {copiedId === msg.id ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-[#16A34A]" />
+                        <Check className="w-3.5 h-3.5 text-[#0F6D4F]" />
                         <span>Đã chép</span>
                       </>
                     ) : (
@@ -270,7 +270,7 @@ export function ParentMessagesView({
                         status: msg.status === 'sent' ? 'draft' : 'sent',
                       })
                     }
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E5ECE7] text-[#1E4D43] text-xs font-medium hover:bg-[#D5E3DA] cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EFF7F3] border border-[#DCECE4] text-[#0F4C3F] text-xs font-semibold hover:bg-[#DCECE4] whitespace-nowrap cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>
@@ -283,7 +283,7 @@ export function ParentMessagesView({
                   type="button"
                   onClick={() => deleteParentMessage(msg.id)}
                   title="Xoá tin nhắn"
-                  className="p-1.5 rounded-lg text-[#7C8581] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
+                  className="p-1.5 rounded-lg text-[#698078] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

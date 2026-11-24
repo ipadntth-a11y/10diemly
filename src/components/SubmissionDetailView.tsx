@@ -10,11 +10,14 @@ import {
   Save,
   Sparkles,
   Table2,
+  Trash2,
   X,
   XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  deleteSubmission,
+  extractFriendlyFirestoreError,
   saveParentMessage,
   updateSubmissionGrading,
 } from '../services/firestoreService';
@@ -75,6 +78,9 @@ export function SubmissionDetailView({
   const [aiError, setAiError] = useState<string | null>(null);
   const [copiedMsg, setCopiedMsg] = useState(false);
   const [savedMsgLog, setSavedMsgLog] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletingSub, setDeletingSub] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const questionRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -84,6 +90,9 @@ export function SubmissionDetailView({
     setAiAnalysis(submission.aiAnalysis);
     setParentPhone(submission.parentPhone);
     setPendingAiImages({});
+    setConfirmDelete(false);
+    setDeletingSub(false);
+    setDeleteError(null);
     setParentMessageText(
       buildDefaultParentMessage(
         submission.studentName,
@@ -439,29 +448,87 @@ export function SubmissionDetailView({
     }
   };
 
+  const handleDeleteCurrentSubmission = async () => {
+    setDeletingSub(true);
+    setDeleteError(null);
+    try {
+      await deleteSubmission(submission.id, teacherId);
+      onBack();
+    } catch (err) {
+      setDeleteError(extractFriendlyFirestoreError(err));
+      setDeletingSub(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Back button */}
-      <div>
+      {/* Top action bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-sm text-[#434D49] hover:text-[#16231F] transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#3A524A] hover:text-[#0A362C] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Kết quả đề</span>
         </button>
+
+        {!confirmDelete && (
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteError(null);
+              setConfirmDelete(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[#FECACA] bg-white text-[#B91C1C] text-xs font-semibold hover:bg-[#FEF2F2] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Xoá bài làm này</span>
+          </button>
+        )}
       </div>
+
+      {confirmDelete && (
+        <div className="p-4 rounded-2xl bg-[#FEF2F2] border border-[#FECACA] flex flex-wrap items-center justify-between gap-3 text-xs text-[#991B1B]">
+          <div>
+            Xác nhận xoá bài làm của <strong>{submission.studentName}</strong> để thu số liệu chuẩn? Sau khi xoá, điểm TB và biểu đồ của đề sẽ tự động cập nhật lại.
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={deletingSub}
+              onClick={handleDeleteCurrentSubmission}
+              className="px-3.5 py-1.5 rounded-xl bg-[#B91C1C] text-white font-semibold hover:bg-[#991B1B] disabled:opacity-60 whitespace-nowrap cursor-pointer"
+            >
+              {deletingSub ? 'Đang xoá...' : 'Xác nhận xoá bài'}
+            </button>
+            <button
+              type="button"
+              disabled={deletingSub}
+              onClick={() => setConfirmDelete(false)}
+              className="px-3.5 py-1.5 rounded-xl border border-[#FECACA] bg-white text-[#991B1B] font-medium hover:bg-[#FEF2F2] whitespace-nowrap cursor-pointer"
+            >
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="p-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#B91C1C]">
+          {deleteError}
+        </div>
+      )}
 
       {/* Student Header */}
       <div className="space-y-2">
-        <h1 className="font-serif text-3xl font-semibold text-[#16231F]">
+        <h1 className="font-serif text-3xl font-semibold text-[#0D221D]">
           {submission.studentName}
         </h1>
-        <div className="text-sm text-[#5C6561] flex flex-wrap items-center gap-2 tabular-nums">
+        <div className="text-sm text-[#4A615A] flex flex-wrap items-center gap-2 tabular-nums">
           {submission.studentCode && (
             <>
-              <span className="font-mono font-medium text-[#1E4D43]">
+              <span className="font-mono font-semibold text-[#0F4C3F]">
                 Mã HS: {submission.studentCode}
               </span>
               <span aria-hidden="true">·</span>
@@ -476,7 +543,7 @@ export function SubmissionDetailView({
               submission.violationCount > 3
                 ? 'text-[#B91C1C] font-semibold'
                 : submission.violationCount > 0
-                  ? 'text-[#B45309] font-medium'
+                  ? 'text-[#8A630D] font-medium'
                   : ''
             }
           >
@@ -489,21 +556,21 @@ export function SubmissionDetailView({
         </div>
 
         {fastGuessCount > 0 && (
-          <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#FEF3C7] text-[#92400E] text-xs font-medium">
+          <div className="inline-flex items-center px-3 py-1 rounded-lg bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] text-xs font-semibold">
             {fastGuessCount} câu trả lời dưới 5s – nghi chọn đại
           </div>
         )}
       </div>
 
-      {/* NEW: Per-question & Response-Time Data Analytics Card */}
-      <section className="bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-5">
+      {/* Per-question & Response-Time Data Analytics Card */}
+      <section className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-5 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="font-serif text-lg font-semibold text-[#16231F] flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-[#1E4D43]" />
+            <h2 className="font-serif text-lg font-semibold text-[#0D221D] flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-[#0F4C3F]" />
               <span>Phân tích dữ liệu từng câu hỏi &amp; thời gian trả lời</span>
             </h2>
-            <p className="text-xs text-[#66706C] mt-0.5">
+            <p className="text-xs text-[#597169] mt-0.5">
               Bấm vào từng cột câu hỏi để cuộn xuống chi tiết câu và so sánh với tốc độ trung bình lớp.
             </p>
           </div>
@@ -511,61 +578,61 @@ export function SubmissionDetailView({
           <button
             type="button"
             onClick={() => setShowTimingTable((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-xs font-medium text-[#16231F] hover:bg-[#F0EEE8] self-start sm:self-auto cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-xs font-medium text-[#0D221D] hover:bg-[#EFF7F3] self-start sm:self-auto cursor-pointer"
           >
-            <Table2 className="w-3.5 h-3.5 text-[#1E4D43]" />
+            <Table2 className="w-3.5 h-3.5 text-[#0F4C3F]" />
             <span>{showTimingTable ? 'Ẩn bảng chi tiết' : 'Xem bảng dữ liệu từng câu'}</span>
           </button>
         </div>
 
         {/* 4 Behavior Summary Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="p-3.5 rounded-xl bg-[#FAF9F6] border border-[#ECEAE4]">
-            <div className="text-[11px] font-medium text-[#66706C] uppercase">
+          <div className="p-3.5 rounded-xl bg-[#F8FAF9] border border-[#EBF1EE]">
+            <div className="text-[11px] font-medium text-[#597169] uppercase">
               Thời gian TB / câu
             </div>
-            <div className="font-serif text-2xl font-semibold text-[#16231F] mt-1 tabular-nums">
+            <div className="font-serif text-2xl font-semibold text-[#0D221D] mt-1 tabular-nums">
               {analytics.avgStudentSec}s
             </div>
-            <div className="text-xs text-[#66706C] mt-0.5 tabular-nums">
+            <div className="text-xs text-[#597169] mt-0.5 tabular-nums">
               TB lớp: {analytics.avgClassSec}s / câu
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-[#FAF9F6] border border-[#ECEAE4]">
-            <div className="text-[11px] font-medium text-[#66706C] uppercase">
+          <div className="p-3.5 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6]">
+            <div className="text-[11px] font-medium text-[#8A630D] uppercase">
               Trả lời nhanh (&lt;5s)
             </div>
-            <div className="font-serif text-2xl font-semibold text-[#B45309] mt-1 tabular-nums">
+            <div className="font-serif text-2xl font-semibold text-[#8A630D] mt-1 tabular-nums">
               {fastGuessCount} câu
             </div>
-            <div className="text-xs text-[#66706C] mt-0.5 tabular-nums">
+            <div className="text-xs text-[#7A580B] mt-0.5 tabular-nums">
               {fastGuessCount > 0
                 ? `Đúng ${analytics.fastCorrect}/${fastGuessCount} câu nhanh`
                 : 'Không có câu khoanh vội'}
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-[#FAF9F6] border border-[#ECEAE4]">
-            <div className="text-[11px] font-medium text-[#66706C] uppercase">
+          <div className="p-3.5 rounded-xl bg-[#F8FAF9] border border-[#EBF1EE]">
+            <div className="text-[11px] font-medium text-[#597169] uppercase">
               Câu dừng lâu nhất
             </div>
-            <div className="font-serif text-2xl font-semibold text-[#16231F] mt-1 tabular-nums">
+            <div className="font-serif text-2xl font-semibold text-[#0D221D] mt-1 tabular-nums">
               Câu {analytics.slowestIdx + 1} · {analytics.slowestSec}s
             </div>
-            <div className="text-xs text-[#66706C] mt-0.5">
+            <div className="text-xs text-[#597169] mt-0.5">
               {analytics.slowestAnswer?.isCorrect ? 'Kết quả: Đúng' : 'Kết quả: Sai / Chưa trọn điểm'}
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-[#FAF9F6] border border-[#ECEAE4]">
-            <div className="text-[11px] font-medium text-[#66706C] uppercase">
+          <div className="p-3.5 rounded-xl bg-[#F8FAF9] border border-[#EBF1EE]">
+            <div className="text-[11px] font-medium text-[#597169] uppercase">
               Nhịp độ Đúng vs Sai
             </div>
-            <div className="font-serif text-2xl font-semibold text-[#1E4D43] mt-1 tabular-nums">
+            <div className="font-serif text-2xl font-semibold text-[#0F4C3F] mt-1 tabular-nums">
               {analytics.avgCorrectSec}s / {analytics.avgWrongSec}s
             </div>
-            <div className="text-xs text-[#66706C] mt-0.5">
+            <div className="text-xs text-[#597169] mt-0.5">
               TB câu đúng vs câu sai
             </div>
           </div>
@@ -573,11 +640,11 @@ export function SubmissionDetailView({
 
         {/* Interactive Per-Question Response-Time Bar Chart */}
         <div className="space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#66706C]">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#597169]">
             <span>Biểu đồ thời gian từng câu (giây)</span>
             <div className="flex flex-wrap items-center gap-4">
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#16A34A]" />
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#0F4C3F]" />
                 <span>Đúng</span>
               </span>
               <span className="inline-flex items-center gap-1.5">
@@ -585,22 +652,22 @@ export function SubmissionDetailView({
                 <span>Sai / Thiếu điểm</span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#D98218]" />
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#C89B2B]" />
                 <span>Nghi chọn đại (&lt;5s)</span>
               </span>
             </div>
           </div>
 
           <div className="overflow-x-auto pb-1">
-            <div className="min-w-[560px] h-40 relative flex items-end gap-1.5 pt-6 pb-6 border-b border-[#E7E5DF]">
+            <div className="min-w-[560px] h-40 relative flex items-end gap-1.5 pt-6 pb-6 border-b border-[#DAE5E0]">
               {/* 5s fast-guess threshold line */}
               <div
                 style={{
                   bottom: `${24 + Math.min(100, (5 / analytics.maxBarSec) * 100) * 0.85}px`,
                 }}
-                className="absolute left-0 right-0 border-t border-dashed border-[#D98218]/70 pointer-events-none flex justify-end"
+                className="absolute left-0 right-0 border-t border-dashed border-[#C89B2B]/80 pointer-events-none flex justify-end"
               >
-                <span className="text-[10px] font-mono text-[#B45309] bg-white px-1 -mt-2">
+                <span className="text-[10px] font-mono text-[#8A630D] bg-white px-1 -mt-2">
                   ngưỡng 5s
                 </span>
               </div>
@@ -613,9 +680,9 @@ export function SubmissionDetailView({
                 );
                 const clsAvg = classStatsByQId.get(ans.questionId)?.avgSeconds || 0;
                 const barBg = isFast
-                  ? 'bg-[#D98218] hover:bg-[#B45309]'
+                  ? 'bg-[#C89B2B] hover:bg-[#9E7514]'
                   : ans.isCorrect
-                    ? 'bg-[#16A34A] hover:bg-[#15803D]'
+                    ? 'bg-[#0F4C3F] hover:bg-[#0A362C]'
                     : 'bg-[#DC2626] hover:bg-[#B91C1C]';
 
                 return (
@@ -628,14 +695,14 @@ export function SubmissionDetailView({
                     }`}
                     className="flex-1 h-full flex flex-col justify-end items-center group cursor-pointer relative"
                   >
-                    <span className="text-[10px] font-mono text-[#434D49] mb-1 opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+                    <span className="text-[10px] font-mono text-[#3A524A] mb-1 opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
                       {ans.timeSpentSeconds}s
                     </span>
                     <div
                       style={{ height: `${heightPct}%` }}
                       className={`w-full max-w-6 rounded-t-md transition-all ${barBg}`}
                     />
-                    <span className="absolute -bottom-5 text-[10px] font-mono text-[#5C6561] tabular-nums">
+                    <span className="absolute -bottom-5 text-[10px] font-mono text-[#4A615A] tabular-nums">
                       C{idx + 1}
                     </span>
                   </button>
@@ -647,10 +714,10 @@ export function SubmissionDetailView({
 
         {/* Toggleable Detailed Matrix */}
         {showTimingTable && (
-          <div className="overflow-x-auto border border-[#E7E5DF] rounded-xl">
+          <div className="overflow-x-auto border border-[#DAE5E0] rounded-xl">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-[#FAF9F6] border-b border-[#E7E5DF] text-[#66706C] uppercase">
+                <tr className="bg-[#F8FAF9] border-b border-[#DAE5E0] text-[#597169] uppercase">
                   <th className="py-2.5 px-3">Câu</th>
                   <th className="py-2.5 px-3">Loại</th>
                   <th className="py-2.5 px-3">Thời gian HS</th>
@@ -660,7 +727,7 @@ export function SubmissionDetailView({
                   <th className="py-2.5 px-3">Nhận định tốc độ</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EEE8]">
+              <tbody className="divide-y divide-[#EDF3F0]">
                 {answers.map((ans, idx) => {
                   const q = exam?.questions.find((qq) => qq.id === ans.questionId);
                   const cls = classStatsByQId.get(ans.questionId);
@@ -670,12 +737,12 @@ export function SubmissionDetailView({
                     <tr
                       key={ans.questionId}
                       onClick={() => scrollToQuestion(ans.questionId)}
-                      className="hover:bg-[#FAF9F6] cursor-pointer"
+                      className="hover:bg-[#EFF7F3] cursor-pointer"
                     >
-                      <td className="py-2.5 px-3 font-semibold text-[#16231F]">
+                      <td className="py-2.5 px-3 font-semibold text-[#0D221D]">
                         Câu {q?.index ?? idx + 1}
                       </td>
-                      <td className="py-2.5 px-3 text-[#5C6561]">
+                      <td className="py-2.5 px-3 text-[#4A615A]">
                         {ans.type === 'mcq'
                           ? 'Trắc nghiệm'
                           : ans.type === 'true_false'
@@ -687,16 +754,16 @@ export function SubmissionDetailView({
                       <td className="py-2.5 px-3 font-mono tabular-nums font-medium">
                         {formatDurationMMSS(ans.timeSpentSeconds)}
                       </td>
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-[#66706C]">
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-[#597169]">
                         {formatDurationMMSS(cls?.avgSeconds || 0)}
                       </td>
-                      <td className="py-2.5 px-3 tabular-nums text-[#434D49]">
+                      <td className="py-2.5 px-3 tabular-nums text-[#3A524A]">
                         {cls?.correctPct ?? 0}%
                       </td>
                       <td className="py-2.5 px-3 font-semibold tabular-nums">
                         <span
                           className={
-                            ans.isCorrect ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                            ans.isCorrect ? 'text-[#0F6D4F]' : 'text-[#DC2626]'
                           }
                         >
                           {ans.score}/{ans.maxScore}
@@ -704,19 +771,19 @@ export function SubmissionDetailView({
                       </td>
                       <td className="py-2.5 px-3">
                         {isFast ? (
-                          <span className="text-[#B45309] font-medium">
+                          <span className="text-[#8A630D] font-medium">
                             Quá nhanh (&lt;5s)
                           </span>
                         ) : diff > 15 ? (
-                          <span className="text-[#5C6561]">
+                          <span className="text-[#4A615A]">
                             Chậm hơn TB +{diff}s
                           </span>
                         ) : diff < -10 ? (
-                          <span className="text-[#1E4D43]">
+                          <span className="text-[#0F4C3F]">
                             Nhanh hơn TB {Math.abs(diff)}s
                           </span>
                         ) : (
-                          <span className="text-[#66706C]">Bình thường</span>
+                          <span className="text-[#597169]">Bình thường</span>
                         )}
                       </td>
                     </tr>
@@ -751,20 +818,20 @@ export function SubmissionDetailView({
                 ref={(el) => {
                   questionRefs.current[ans.questionId] = el;
                 }}
-                className="bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-4"
+                className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-4 shadow-[0_1px_2px_rgba(10,54,44,0.03)]"
               >
                 {/* Question header row */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="text-xs font-medium text-[#5C6561]">
+                    <span className="text-xs font-semibold text-[#0F4C3F]">
                       Câu {question?.index ?? idx + 1} · {typeLabel}
                     </span>
 
                     <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono tabular-nums ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-mono tabular-nums ${
                         isFastGuess
-                          ? 'bg-[#FEF3C7] text-[#B45309] font-semibold'
-                          : 'bg-[#F0EEE8] text-[#5C6561]'
+                          ? 'bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] font-semibold'
+                          : 'bg-[#EFF7F3] text-[#3A524A]'
                       }`}
                     >
                       <Clock className="w-3 h-3" />
@@ -775,13 +842,13 @@ export function SubmissionDetailView({
                     </span>
 
                     {clsStat && (
-                      <span className="text-[11px] text-[#66706C] tabular-nums">
+                      <span className="text-[11px] text-[#597169] tabular-nums">
                         TB lớp: {formatDurationMMSS(clsStat.avgSeconds)} · {clsStat.correctPct}% đúng
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-[#5C6561]">
+                  <div className="flex items-center gap-2 text-xs text-[#4A615A]">
                     <span>Điểm</span>
                     <input
                       type="number"
@@ -792,7 +859,7 @@ export function SubmissionDetailView({
                       onChange={(e) =>
                         handleScoreChange(ans.questionId, e.target.value, ans.maxScore)
                       }
-                      className="w-16 px-2.5 py-1 rounded-full border border-[#DCD9D0] bg-white text-center text-xs font-semibold text-[#16231F] tabular-nums focus:outline-none focus:border-[#1E4D43]"
+                      className="w-16 px-2.5 py-1 rounded-lg border border-[#CEDCD6] bg-white text-center text-xs font-semibold text-[#0D221D] tabular-nums focus:outline-none focus:border-[#0F4C3F]"
                     />
                     <span className="tabular-nums">/ {ans.maxScore}</span>
                   </div>
@@ -803,7 +870,7 @@ export function SubmissionDetailView({
                   <div className="space-y-3">
                     <MathText
                       text={question.prompt}
-                      className="text-sm sm:text-[15px] text-[#16231F] leading-relaxed whitespace-pre-line"
+                      className="text-sm sm:text-[15px] text-[#0D221D] leading-relaxed whitespace-pre-line"
                     />
                     {question.imageUrls && question.imageUrls.length > 0 && (
                       <div className="flex flex-wrap gap-2.5">
@@ -812,7 +879,7 @@ export function SubmissionDetailView({
                             key={uIdx}
                             type="button"
                             onClick={() => setZoomImageUrl(url)}
-                            className="cursor-zoom-in rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] p-1.5 hover:border-[#1E4D43]"
+                            className="cursor-zoom-in rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] p-1.5 hover:border-[#0F4C3F]"
                           >
                             <img
                               src={url}
@@ -834,12 +901,12 @@ export function SubmissionDetailView({
                       const isStudentOpt = ans.selectedOption === optIdx;
                       const isWrongPick = isStudentOpt && !isCorrectOpt;
 
-                      let boxStyle = 'border-[#E7E5DF] bg-white text-[#434D49]';
-                      let badgeStyle = 'bg-[#F0EEE8] text-[#5C6561]';
+                      let boxStyle = 'border-[#DAE5E0] bg-white text-[#3A524A]';
+                      let badgeStyle = 'bg-[#EBF1EE] text-[#4A615A]';
 
                       if (isCorrectOpt) {
-                        boxStyle = 'border-[#34A853] bg-[#F2FBF5] text-[#16231F] font-medium';
-                        badgeStyle = 'bg-[#22A05B] text-white';
+                        boxStyle = 'border-[#0F6D4F] bg-[#F0FBF6] text-[#0D221D] font-medium';
+                        badgeStyle = 'bg-[#0F6D4F] text-white';
                       } else if (isWrongPick) {
                         boxStyle = 'border-[#DC2626] bg-[#FEF2F2] text-[#991B1B] font-medium';
                         badgeStyle = 'bg-[#DC2626] text-white';
@@ -864,25 +931,25 @@ export function SubmissionDetailView({
 
                 {/* True / False Statements */}
                 {ans.type === 'true_false' && question?.statements && (
-                  <div className="divide-y divide-[#F0EEE8] border border-[#E7E5DF] rounded-xl overflow-hidden">
+                  <div className="divide-y divide-[#EDF3F0] border border-[#DAE5E0] rounded-xl overflow-hidden">
                     {question.statements.map((st, sIdx) => {
                       const studentVal = ans.statementAnswers?.[sIdx];
                       const matched = studentVal === st.isTrue;
                       return (
                         <div
                           key={sIdx}
-                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm bg-[#FAF9F6]"
+                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm bg-[#F8FAF9]"
                         >
-                          <div className="text-[#16231F]">
+                          <div className="text-[#0D221D]">
                             <span className="font-semibold mr-1.5">
                               {TF_LETTERS[sIdx]})
                             </span>
                             <MathText text={st.text} inline />
                           </div>
                           <div className="flex items-center gap-3 shrink-0 text-xs">
-                            <span className="text-[#5C6561]">
+                            <span className="text-[#4A615A]">
                               HS chọn:{' '}
-                              <strong className={matched ? 'text-[#16A34A]' : 'text-[#DC2626]'}>
+                              <strong className={matched ? 'text-[#0F6D4F]' : 'text-[#DC2626]'}>
                                 {studentVal === true
                                   ? 'Đúng'
                                   : studentVal === false
@@ -890,7 +957,7 @@ export function SubmissionDetailView({
                                     : 'Chưa chọn'}
                               </strong>
                             </span>
-                            <span className="text-[#1E4D43] font-medium">
+                            <span className="text-[#0F4C3F] font-medium">
                               Đáp án: {st.isTrue ? 'Đúng' : 'Sai'}
                             </span>
                           </div>
@@ -902,13 +969,13 @@ export function SubmissionDetailView({
 
                 {/* 4-Box Short Answer Display */}
                 {ans.type === 'short_answer' && (
-                  <div className="p-4 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-3">
+                  <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-[#66706C]">
+                      <span className="text-xs font-medium text-[#597169]">
                         Phiếu điền số học sinh (4 ô)
                       </span>
                       {question?.correctAnswer && (
-                        <span className="text-xs text-[#1E4D43] font-semibold font-mono">
+                        <span className="text-xs text-[#0F4C3F] font-semibold font-mono">
                           Đáp số chuẩn: {question.correctAnswer}
                         </span>
                       )}
@@ -921,8 +988,8 @@ export function SubmissionDetailView({
                             key={boxIdx}
                             className={`w-11 h-11 rounded-xl border-2 flex items-center justify-center font-mono text-lg font-bold tabular-nums bg-white ${
                               ans.isCorrect
-                                ? 'border-[#34A853] text-[#166534]'
-                                : 'border-[#DCD9D0] text-[#16231F]'
+                                ? 'border-[#0F6D4F] text-[#0A362C]'
+                                : 'border-[#CEDCD6] text-[#0D221D]'
                             }`}
                           >
                             {ch || '·'}
@@ -936,14 +1003,14 @@ export function SubmissionDetailView({
                 {/* Essay + Photo Upload & Per-Question AI Grading */}
                 {ans.type === 'essay' && (
                   <div className="space-y-3">
-                    <div className="p-3.5 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] text-sm space-y-2.5">
+                    <div className="p-3.5 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] text-sm space-y-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-[#66706C]">
+                        <span className="text-xs font-medium text-[#597169]">
                           Bài làm tự luận của học sinh
                         </span>
                         <div className="flex items-center gap-2">
-                          <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#DCD9D0] bg-white text-xs font-medium text-[#16231F] hover:bg-[#F5F4F0] cursor-pointer">
-                            <Camera className="w-3.5 h-3.5 text-[#1E4D43]" />
+                          <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] hover:bg-[#EFF7F3] cursor-pointer">
+                            <Camera className="w-3.5 h-3.5 text-[#0F4C3F]" />
                             <span>
                               {ans.imageDataUrl ? 'Đổi ảnh bài làm' : 'Tải ảnh bài làm'}
                             </span>
@@ -965,9 +1032,9 @@ export function SubmissionDetailView({
                             type="button"
                             disabled={gradingSingleId === ans.questionId}
                             onClick={() => handleGradeSingleQuestionAI(ans)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#E5ECE7] text-[#1E4D43] text-xs font-semibold hover:bg-[#D5E3DA] disabled:opacity-60 cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] text-xs font-semibold hover:bg-[#FAF1D6] disabled:opacity-60 cursor-pointer"
                           >
-                            <Sparkles className="w-3.5 h-3.5" />
+                            <Sparkles className="w-3.5 h-3.5 text-[#B0831A]" />
                             <span>
                               {gradingSingleId === ans.questionId
                                 ? 'Đang chấm barem...'
@@ -980,11 +1047,11 @@ export function SubmissionDetailView({
                       {ans.textAnswer?.trim() ? (
                         <MathText
                           text={ans.textAnswer}
-                          className="text-[#16231F] whitespace-pre-line leading-relaxed"
+                          className="text-[#0D221D] whitespace-pre-line leading-relaxed"
                         />
                       ) : (
                         !ans.imageDataUrl && (
-                          <div className="italic text-[#8C9590]">(Bỏ trống)</div>
+                          <div className="italic text-[#698078]">(Bỏ trống)</div>
                         )
                       )}
 
@@ -998,9 +1065,9 @@ export function SubmissionDetailView({
                             <img
                               src={ans.imageDataUrl}
                               alt={`Ảnh bài làm câu ${question?.index ?? idx + 1}`}
-                              className="max-h-52 rounded-xl border border-[#DCD9D0] object-contain bg-white"
+                              className="max-h-52 rounded-xl border border-[#CEDCD6] object-contain bg-white"
                             />
-                            <span className="text-[11px] text-[#1E4D43] mt-1 inline-block group-hover:underline">
+                            <span className="text-[11px] text-[#0F4C3F] mt-1 inline-block group-hover:underline">
                               Nhấn để phóng to ảnh bài làm
                             </span>
                           </button>
@@ -1009,20 +1076,20 @@ export function SubmissionDetailView({
                     </div>
 
                     {ans.recognizedText && (
-                      <div className="p-3 rounded-xl bg-white border border-[#E7E5DF] space-y-1">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#66706C]">
+                      <div className="p-3 rounded-xl bg-white border border-[#DAE5E0] space-y-1">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#597169]">
                           Nội dung AI đọc được từ ảnh
                         </div>
                         <MathText
                           text={ans.recognizedText}
-                          className="text-xs text-[#16231F] whitespace-pre-line leading-relaxed"
+                          className="text-xs text-[#0D221D] whitespace-pre-line leading-relaxed"
                         />
                       </div>
                     )}
 
                     {ans.aiBreakdown && ans.aiBreakdown.length > 0 && (
-                      <div className="p-3 rounded-xl bg-white border border-[#E7E5DF] space-y-1.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#66706C]">
+                      <div className="p-3 rounded-xl bg-white border border-[#DAE5E0] space-y-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#597169]">
                           Chi tiết chấm theo Barem 4 bước (AI)
                         </div>
                         {ans.aiBreakdown.map((b, bIdx) => (
@@ -1030,9 +1097,9 @@ export function SubmissionDetailView({
                             key={bIdx}
                             className="flex items-start justify-between gap-2 text-xs"
                           >
-                            <div className="flex items-start gap-1.5 text-[#16231F]">
+                            <div className="flex items-start gap-1.5 text-[#0D221D]">
                               {b.met ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />
+                                <CheckCircle2 className="w-3.5 h-3.5 text-[#0F6D4F] shrink-0 mt-0.5" />
                               ) : (
                                 <XCircle className="w-3.5 h-3.5 text-[#DC2626] shrink-0 mt-0.5" />
                               )}
@@ -1047,14 +1114,14 @@ export function SubmissionDetailView({
                     )}
 
                     {question?.correctAnswer && (
-                      <div className="text-xs text-[#434D49]">
+                      <div className="text-xs text-[#3A524A]">
                         <span className="font-semibold">Đáp án chuẩn:</span>{' '}
                         <MathText text={question.correctAnswer} inline />
                       </div>
                     )}
 
                     {ans.aiFeedback && (
-                      <div className="p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E]">
+                      <div className="p-3 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-xs text-[#7A580B]">
                         <span className="font-semibold">Nhận xét AI:</span>{' '}
                         <MathText text={ans.aiFeedback} inline />
                       </div>
@@ -1066,14 +1133,14 @@ export function SubmissionDetailView({
                 {(question?.explanation ||
                   (question?.explanationImageUrls &&
                     question.explanationImageUrls.length > 0)) && (
-                  <div className="p-4 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] space-y-2">
-                    <div className="text-[11px] font-bold tracking-[0.06em] text-[#1E7E48] uppercase">
+                  <div className="p-4 rounded-xl bg-[#EFF7F3] border border-[#C5DDD3] space-y-2">
+                    <div className="text-[11px] font-bold tracking-[0.06em] text-[#0F4C3F] uppercase">
                       {ans.type === 'essay' ? 'Hướng dẫn giải' : 'Lời giải'}
                     </div>
                     {question.explanation && (
                       <MathText
                         text={question.explanation}
-                        className="text-sm text-[#1F3A2B] leading-relaxed whitespace-pre-line"
+                        className="text-sm text-[#0D221D] leading-relaxed whitespace-pre-line"
                       />
                     )}
                     {question.explanationImageUrls &&
@@ -1084,7 +1151,7 @@ export function SubmissionDetailView({
                               key={uIdx}
                               src={u}
                               alt={`Hướng dẫn giải câu ${question.index}`}
-                              className="max-h-40 rounded-lg border border-[#BBF7D0] object-contain bg-white"
+                              className="max-h-40 rounded-lg border border-[#C5DDD3] object-contain bg-white"
                             />
                           ))}
                         </div>
@@ -1099,13 +1166,13 @@ export function SubmissionDetailView({
         {/* Right Sticky Grading & Parent Messaging Sidebar */}
         <aside className="lg:col-span-4 space-y-5 lg:sticky lg:top-6">
           {/* Score & AI Controls Card */}
-          <div className="bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-4">
+          <div className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-4 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
             <div className="flex items-baseline justify-between gap-3">
               <div>
-                <span className="font-serif text-4xl font-semibold text-[#16231F] tabular-nums">
+                <span className="font-serif text-4xl font-semibold text-[#0A362C] tabular-nums">
                   {formatScore(computedTotal)}
                 </span>
-                <span className="text-sm text-[#66706C] ml-1 tabular-nums">
+                <span className="text-sm text-[#597169] ml-1 tabular-nums">
                   /{formatScore(submission.maxScore)}
                 </span>
               </div>
@@ -1113,9 +1180,9 @@ export function SubmissionDetailView({
               <span
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                   tier.tone === 'high'
-                    ? 'bg-[#E5ECE7] text-[#1E4D43]'
+                    ? 'bg-[#EFF7F3] border border-[#C5DDD3] text-[#0F4C3F]'
                     : tier.tone === 'mid'
-                      ? 'bg-[#FEF3C7] text-[#92400E]'
+                      ? 'bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D]'
                       : 'bg-[#FEE2E2] text-[#991B1B]'
                 }`}
               >
@@ -1126,7 +1193,7 @@ export function SubmissionDetailView({
             <div>
               <label
                 htmlFor="teacher-comment-box"
-                className="block text-xs font-semibold text-[#16231F] mb-1.5"
+                className="block text-xs font-semibold text-[#0D221D] mb-1.5"
               >
                 Lời phê
               </label>
@@ -1136,7 +1203,7 @@ export function SubmissionDetailView({
                 value={teacherComment}
                 onChange={(e) => setTeacherComment(e.target.value)}
                 placeholder="Nhận xét ngắn gọn cho học sinh..."
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-white text-sm text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
               />
             </div>
 
@@ -1145,16 +1212,16 @@ export function SubmissionDetailView({
                 type="button"
                 disabled={saving}
                 onClick={handleSave}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors disabled:opacity-60 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] transition-colors disabled:opacity-60 cursor-pointer"
               >
                 {savedNotice ? (
                   <>
-                    <Check className="w-4 h-4" />
+                    <Check className="w-4 h-4 text-[#E5C665]" />
                     <span>Đã lưu điểm</span>
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
+                    <Save className="w-4 h-4 text-[#E5C665]" />
                     <span>{saving ? 'Đang lưu...' : 'Lưu điểm'}</span>
                   </>
                 )}
@@ -1164,9 +1231,9 @@ export function SubmissionDetailView({
                 type="button"
                 disabled={analyzingAi}
                 onClick={handleAnalyzeStudent}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-[#DCD9D0] bg-white text-[#16231F] text-sm font-medium hover:bg-[#FAF9F6] transition-colors disabled:opacity-60 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-[#CEDCD6] bg-white text-[#0D221D] text-sm font-medium hover:bg-[#EFF7F3] transition-colors disabled:opacity-60 cursor-pointer"
               >
-                <Sparkles className="w-4 h-4 text-[#1E4D43]" />
+                <Sparkles className="w-4 h-4 text-[#0F4C3F]" />
                 <span>
                   {analyzingAi
                     ? 'Đang phân tích dữ liệu câu...'
@@ -1178,9 +1245,9 @@ export function SubmissionDetailView({
                 type="button"
                 disabled={gradingEssayAi}
                 onClick={handleGradeAllEssaysAI}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-[#DCD9D0] bg-white text-[#16231F] text-sm font-medium hover:bg-[#FAF9F6] transition-colors disabled:opacity-60 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] text-[#8A630D] text-sm font-semibold hover:bg-[#FAF1D6] transition-colors disabled:opacity-60 cursor-pointer"
               >
-                <Sparkles className="w-4 h-4 text-[#D98218]" />
+                <Sparkles className="w-4 h-4 text-[#B0831A]" />
                 <span>
                   {gradingEssayAi
                     ? 'AI đang chấm theo Barem...'
@@ -1196,11 +1263,11 @@ export function SubmissionDetailView({
             )}
 
             {aiAnalysis && (
-              <div className="p-3.5 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-1.5">
-                <div className="text-xs font-semibold text-[#1E4D43]">
+              <div className="p-3.5 rounded-xl bg-[#EFF7F3] border border-[#C5DDD3] space-y-1.5">
+                <div className="text-xs font-semibold text-[#0F4C3F]">
                   Phân tích học lực theo từng câu &amp; tốc độ (AI)
                 </div>
-                <p className="text-xs text-[#434D49] leading-relaxed whitespace-pre-line">
+                <p className="text-xs text-[#3A524A] leading-relaxed whitespace-pre-line">
                   {aiAnalysis}
                 </p>
               </div>
@@ -1208,13 +1275,13 @@ export function SubmissionDetailView({
           </div>
 
           {/* Parent Message Card */}
-          <div className="bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-3.5">
+          <div className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-3.5 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#16231F]">
-                <MessageSquare className="w-4 h-4 text-[#1E4D43]" />
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#0D221D]">
+                <MessageSquare className="w-4 h-4 text-[#8A630D]" />
                 <span>Tin nhắn phụ huynh</span>
               </div>
-              <span className="text-xs text-[#66706C]">
+              <span className="text-xs text-[#597169]">
                 {parentPhone.trim() ? parentPhone : 'chưa có SĐT'}
               </span>
             </div>
@@ -1224,25 +1291,25 @@ export function SubmissionDetailView({
               value={parentPhone}
               onChange={(e) => setParentPhone(e.target.value)}
               placeholder="Nhập SĐT phụ huynh (09xxxxxxxx)..."
-              className="w-full px-3 py-2 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-xs font-mono text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+              className="w-full px-3 py-2 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-xs font-mono text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
             />
 
             <textarea
               rows={5}
               value={parentMessageText}
               onChange={(e) => setParentMessageText(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E5DF] bg-[#FAF9F6] text-xs text-[#434D49] leading-relaxed focus:outline-none focus:border-[#1E4D43]"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#DAE5E0] bg-[#F8FAF9] text-xs text-[#3A524A] leading-relaxed focus:outline-none focus:border-[#0F4C3F]"
             />
 
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={handleCopyMessage}
-                className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-[#DCD9D0] bg-white text-xs font-medium text-[#16231F] hover:bg-[#FAF9F6] cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] hover:bg-[#F8FAF9] cursor-pointer"
               >
                 {copiedMsg ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-[#16A34A]" />
+                    <Check className="w-3.5 h-3.5 text-[#0F6D4F]" />
                     <span>Đã chép</span>
                   </>
                 ) : (
@@ -1256,7 +1323,7 @@ export function SubmissionDetailView({
               <button
                 type="button"
                 onClick={handleSaveToParentLog}
-                className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#E5ECE7] text-[#1E4D43] text-xs font-semibold hover:bg-[#D5E3DA] cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#EFF7F3] text-[#0F4C3F] text-xs font-semibold hover:bg-[#DCECE4] cursor-pointer"
               >
                 {savedMsgLog ? 'Đã lưu nhật ký' : 'Lưu nhật ký gửi'}
               </button>
@@ -1269,12 +1336,12 @@ export function SubmissionDetailView({
       {zoomImageUrl && (
         <div
           onClick={() => setZoomImageUrl(null)}
-          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-[#082B23]/80 flex items-center justify-center p-4"
         >
           <button
             type="button"
             onClick={() => setZoomImageUrl(null)}
-            className="absolute top-4 right-4 p-2 rounded-full bg-white text-[#16231F] cursor-pointer"
+            className="absolute top-4 right-4 p-2 rounded-full bg-white text-[#0D221D] cursor-pointer"
             aria-label="Đóng ảnh"
           >
             <X className="w-5 h-5" />

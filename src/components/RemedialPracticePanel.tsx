@@ -88,14 +88,14 @@ export function RemedialPracticePanel({
 
   if (wrongCount === 0) {
     return (
-      <div className="bg-white border border-[#E7E5DF] rounded-2xl p-8 text-center space-y-3">
-        <div className="w-12 h-12 rounded-2xl bg-[#E5ECE7] text-[#1E4D43] flex items-center justify-center mx-auto">
+      <div className="bg-white border border-[#DAE5E0] rounded-2xl p-8 text-center space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-[#EFF7F3] border border-[#C5DDD3] text-[#0F6D4F] flex items-center justify-center mx-auto">
           <CheckCircle2 className="w-6 h-6" />
         </div>
-        <h3 className="font-serif text-xl font-semibold text-[#16231F]">
+        <h3 className="font-serif text-xl font-semibold text-[#0D221D]">
           Bạn không có câu sai nào ở phần tự chấm!
         </h3>
-        <p className="text-sm text-[#5C6561] max-w-md mx-auto">
+        <p className="text-sm text-[#4A615A] max-w-md mx-auto">
           Toàn bộ các câu trắc nghiệm, đúng/sai và trả lời ngắn bạn đều đã đạt điểm tối đa.
         </p>
       </div>
@@ -104,15 +104,15 @@ export function RemedialPracticePanel({
 
   if (loading) {
     return (
-      <div className="bg-white border border-[#E7E5DF] rounded-2xl p-8 sm:p-10 text-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-[#EEF5F1] text-[#1E4D43] flex items-center justify-center mx-auto">
+      <div className="bg-white border border-[#DAE5E0] rounded-2xl p-8 sm:p-10 text-center space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-[#EFF7F3] border border-[#DCECE4] text-[#0F4C3F] flex items-center justify-center mx-auto">
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
         <div className="space-y-1">
-          <h3 className="font-serif text-xl font-semibold text-[#16231F]">
+          <h3 className="font-serif text-xl font-semibold text-[#0D221D]">
             AI đang phân tích {wrongCount} câu sai và soạn câu hỏi ôn tập...
           </h3>
-          <p className="text-sm text-[#5C6561] max-w-lg mx-auto">
+          <p className="text-sm text-[#4A615A] max-w-lg mx-auto">
             Hệ thống đang tạo các câu hỏi tương tự sát với phần kiến thức bạn vừa nhầm lẫn để bạn luyện tập ngay.
           </p>
         </div>
@@ -123,19 +123,19 @@ export function RemedialPracticePanel({
   if (error) {
     return (
       <div className="bg-white border border-[#FECACA] rounded-2xl p-6 space-y-3">
-        <div className="flex items-start gap-3 text-[#991B1B]">
+        <div className="flex items-start gap-3 text-[#B91C1C]">
           <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <div className="text-sm font-semibold">Không thể tạo bộ câu hỏi ôn tập AI</div>
-            <p className="text-xs text-[#7F1D1D]">{error}</p>
+            <p className="text-xs text-[#991B1B]">{error}</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onRegenerate}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-xs font-semibold hover:bg-[#163B33] cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] cursor-pointer"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className="w-3.5 h-3.5 text-[#E5C665]" />
           <span>Thử tạo lại</span>
         </button>
       </div>
@@ -144,16 +144,16 @@ export function RemedialPracticePanel({
 
   if (!practiceData || practiceData.practiceQuestions.length === 0) {
     return (
-      <div className="bg-white border border-[#E7E5DF] rounded-2xl p-8 text-center space-y-4">
-        <p className="text-sm text-[#5C6561]">
+      <div className="bg-white border border-[#DAE5E0] rounded-2xl p-8 text-center space-y-4">
+        <p className="text-sm text-[#4A615A]">
           Chưa có bộ câu hỏi ôn tập. Nhấn nút bên dưới để AI soạn câu hỏi dựa trên các câu bạn đã sai.
         </p>
         <button
           type="button"
           onClick={onRegenerate}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E4D43] text-white text-sm font-semibold hover:bg-[#163B33] cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] cursor-pointer shadow-xs"
         >
-          <Sparkles className="w-4 h-4" />
+          <Sparkles className="w-4 h-4 text-[#E5C665]" />
           <span>Tạo câu hỏi ôn tập bằng AI</span>
         </button>
       </div>
@@ -181,21 +181,21 @@ export function RemedialPracticePanel({
   return (
     <div className="space-y-5">
       {/* AI Summary Header */}
-      <div className="bg-[#EEF5F1] border border-[#CFE0D7] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-gradient-to-br from-[#EFF7F3] to-[#FDF8EB] border border-[#DCECE4] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#1E4D43]">
-            <Sparkles className="w-4 h-4" />
+          <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#8A630D]">
+            <Sparkles className="w-4 h-4 text-[#C89B2B]" />
             <span>Bài ôn tập cá nhân hoá từ AI</span>
           </div>
           <MathText
             text={practiceData.focusSummary}
-            className="text-sm text-[#16231F] leading-relaxed"
+            className="text-sm text-[#0D221D] leading-relaxed"
           />
         </div>
         <button
           type="button"
           onClick={onRegenerate}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#BFD5C9] bg-white text-xs font-semibold text-[#1E4D43] hover:bg-[#F5F9F7] shrink-0 cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs font-semibold text-[#0F4C3F] hover:bg-[#EFF7F3] shrink-0 whitespace-nowrap cursor-pointer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Tạo bộ câu mới</span>
@@ -214,22 +214,22 @@ export function RemedialPracticePanel({
           <div
             className={`rounded-2xl border p-5 space-y-3 ${
               correctTotal === questions.length
-                ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#166534]'
-                : 'bg-white border-[#E7E5DF] text-[#16231F]'
+                ? 'bg-[#F0FBF6] border-[#C5DDD3] text-[#0A362C]'
+                : 'bg-white border-[#DAE5E0] text-[#0D221D]'
             }`}
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 {correctTotal === questions.length ? (
-                  <CheckCircle2 className="w-5 h-5 text-[#16A34A] shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-[#0F6D4F] shrink-0" />
                 ) : (
-                  <Sparkles className="w-5 h-5 text-[#1E4D43] shrink-0" />
+                  <Sparkles className="w-5 h-5 text-[#C89B2B] shrink-0" />
                 )}
                 <div>
                   <div className="text-sm font-semibold tabular-nums">
                     Kết quả ôn tập: {correctTotal} / {questions.length} câu đúng hoàn toàn
                   </div>
-                  <div className="text-xs text-[#5C6561]">
+                  <div className="text-xs text-[#4A615A]">
                     {correctTotal === questions.length
                       ? 'Tuyệt vời! Bạn đã khắc phục được các dạng kiến thức từng làm sai.'
                       : 'Xem phân tích lời giải từng câu bên dưới, sau đó bấm Làm lại hoặc Tạo bộ câu mới để luyện thêm.'}
@@ -239,21 +239,21 @@ export function RemedialPracticePanel({
               <button
                 type="button"
                 onClick={handleResetAttempt}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#DCD9D0] bg-white text-xs font-semibold text-[#16231F] hover:bg-[#FAF9F6] shrink-0 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs font-semibold text-[#0D221D] hover:bg-[#F8FAF9] shrink-0 whitespace-nowrap cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Làm lại bộ này</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs pt-1 border-t border-[#E7E5DF]/70">
-              <div className="p-2.5 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] text-[#1F3A2B]">
-                <span className="font-semibold text-[#1E7E48]">Đã nắm vững: </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs pt-2 border-t border-[#EDF3F0]">
+              <div className="p-2.5 rounded-xl bg-[#F0FBF6] border border-[#C5DDD3] text-[#0D221D]">
+                <span className="font-semibold text-[#0F6D4F]">Đã nắm vững: </span>
                 <span>
                   {masteredTopics.length > 0 ? masteredTopics.join(', ') : 'Chưa có chuyên đề đạt 100%'}
                 </span>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E]">
+              <div className="p-2.5 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-[#7A580B]">
                 <span className="font-semibold">Cần luyện thêm: </span>
                 <span>
                   {remainingTopics.length > 0
@@ -283,25 +283,25 @@ export function RemedialPracticePanel({
               className={`bg-white border rounded-2xl p-5 space-y-4 ${
                 checked
                   ? right
-                    ? 'border-[#86EFAC]'
+                    ? 'border-[#C5DDD3]'
                     : 'border-[#FCA5A5]'
-                  : 'border-[#E7E5DF]'
+                  : 'border-[#DAE5E0]'
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="flex flex-wrap items-center gap-2 text-[#5C6561]">
-                  <span className="font-semibold text-[#1E4D43]">
+                <div className="flex flex-wrap items-center gap-2 text-[#4A615A]">
+                  <span className="font-semibold text-[#0F4C3F]">
                     Câu ôn {idx + 1} · {typeLabel}
                   </span>
                   <span>· Luyện lại từ Câu {pq.sourceQuestionIndex}</span>
-                  <span className="px-2 py-0.5 rounded-md bg-[#F5F4F0] text-[#434D49] font-medium">
+                  <span className="px-2 py-0.5 rounded-md bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] font-medium">
                     {pq.focusTopic}
                   </span>
                 </div>
                 {checked && (
                   <span
                     className={`inline-flex items-center gap-1 font-semibold ${
-                      right ? 'text-[#15803D]' : 'text-[#B91C1C]'
+                      right ? 'text-[#0F6D4F]' : 'text-[#B91C1C]'
                     }`}
                   >
                     {right ? (
@@ -321,7 +321,7 @@ export function RemedialPracticePanel({
 
               <MathText
                 text={pq.prompt}
-                className="text-sm text-[#16231F] whitespace-pre-line leading-relaxed font-medium"
+                className="text-sm text-[#0D221D] whitespace-pre-line leading-relaxed font-medium"
               />
 
               {/* MCQ */}
@@ -331,17 +331,17 @@ export function RemedialPracticePanel({
                     const picked = mcqPicks[pq.id] === optIdx;
                     const isKey = pq.correctOption === optIdx;
                     let cls =
-                      'border-[#DCD9D0] bg-white text-[#16231F] hover:border-[#1E4D43]';
+                      'border-[#CEDCD6] bg-white text-[#0D221D] hover:border-[#0F4C3F]';
                     if (checked) {
                       if (isKey) {
-                        cls = 'border-[#16A34A] bg-[#F0FDF4] text-[#14532D] font-medium';
+                        cls = 'border-[#0F6D4F] bg-[#F0FBF6] text-[#0A362C] font-medium';
                       } else if (picked && !isKey) {
                         cls = 'border-[#DC2626] bg-[#FEF2F2] text-[#7F1D1D]';
                       } else {
-                        cls = 'border-[#E7E5DF] bg-[#FAF9F6] text-[#66706C]';
+                        cls = 'border-[#DAE5E0] bg-[#F8FAF9] text-[#597169]';
                       }
                     } else if (picked) {
-                      cls = 'border-[#1E4D43] bg-[#EEF5F1] text-[#16231F] font-medium';
+                      cls = 'border-[#0F4C3F] bg-[#EFF7F3] text-[#0D221D] font-medium ring-1 ring-[#C89B2B]/40';
                     }
 
                     return (
@@ -379,12 +379,12 @@ export function RemedialPracticePanel({
                         className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                           checked
                             ? stRight
-                              ? 'border-[#BBF7D0] bg-[#F0FDF4]'
+                              ? 'border-[#C5DDD3] bg-[#F0FBF6]'
                               : 'border-[#FECACA] bg-[#FEF2F2]'
-                            : 'border-[#E7E5DF] bg-[#FAF9F6]'
+                            : 'border-[#DAE5E0] bg-[#F8FAF9]'
                         }`}
                       >
-                        <div className="flex items-start gap-2 text-sm text-[#16231F]">
+                        <div className="flex items-start gap-2 text-sm text-[#0D221D]">
                           <span className="font-mono font-bold shrink-0">
                             {TF_LETTERS[sIdx]})
                           </span>
@@ -409,8 +409,8 @@ export function RemedialPracticePanel({
                                   checked ? 'cursor-default' : 'cursor-pointer'
                                 } ${
                                   active
-                                    ? 'bg-[#1E4D43] text-white border-[#1E4D43]'
-                                    : 'bg-white text-[#434D49] border-[#DCD9D0] hover:border-[#1E4D43]'
+                                    ? 'bg-[#0F4C3F] text-white border-[#0F4C3F]'
+                                    : 'bg-white text-[#3A524A] border-[#CEDCD6] hover:border-[#0F4C3F]'
                                 }`}
                               >
                                 {val ? 'Đúng' : 'Sai'}
@@ -418,7 +418,7 @@ export function RemedialPracticePanel({
                             );
                           })}
                           {checked && (
-                            <span className="text-[11px] font-semibold text-[#1E4D43] ml-1">
+                            <span className="text-[11px] font-semibold text-[#0F4C3F] ml-1">
                               Đáp án: {st.isTrue ? 'Đúng' : 'Sai'}
                             </span>
                           )}
@@ -444,12 +444,12 @@ export function RemedialPracticePanel({
                     }
                     placeholder="Nhập đáp số của bạn (tối đa 4 ký tự)..."
                     maxLength={8}
-                    className="px-3.5 py-2 rounded-xl border border-[#DCD9D0] bg-white font-mono text-sm font-semibold text-[#16231F] w-64 focus:outline-none focus:border-[#1E4D43]"
+                    className="px-3.5 py-2 rounded-xl border border-[#CEDCD6] bg-white font-mono text-sm font-semibold text-[#0D221D] w-64 focus:outline-none focus:border-[#0F4C3F]"
                   />
                   {checked && pq.correctAnswer && (
-                    <span className="text-xs text-[#1E4D43] font-semibold">
+                    <span className="text-xs text-[#0F4C3F] font-semibold">
                       Đáp số đúng:{' '}
-                      <span className="font-mono px-2 py-0.5 rounded bg-[#E5ECE7]">
+                      <span className="font-mono px-2 py-0.5 rounded bg-[#EFF7F3] border border-[#C5DDD3]">
                         {pq.correctAnswer}
                       </span>
                     </span>
@@ -459,8 +459,8 @@ export function RemedialPracticePanel({
 
               {/* Explanation shown after checking */}
               {checked && pq.explanation && (
-                <div className="p-3.5 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] text-xs text-[#1F3A2B] space-y-1.5">
-                  <div className="uppercase tracking-wider font-bold text-[#1E7E48]">
+                <div className="p-3.5 rounded-xl bg-[#F0FBF6] border border-[#C5DDD3] text-xs text-[#0D221D] space-y-1.5">
+                  <div className="uppercase tracking-wider font-bold text-[#0F6D4F]">
                     Lời giải câu ôn tập:
                   </div>
                   <MathText
@@ -480,9 +480,9 @@ export function RemedialPracticePanel({
           <button
             type="button"
             onClick={() => setChecked(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E4D43] text-white text-sm font-semibold hover:bg-[#163B33] cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] cursor-pointer shadow-xs"
           >
-            <CheckCircle2 className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4 text-[#E5C665]" />
             <span>Kiểm tra kết quả ôn tập</span>
           </button>
         ) : (
@@ -490,7 +490,7 @@ export function RemedialPracticePanel({
             <button
               type="button"
               onClick={handleResetAttempt}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#DCD9D0] bg-white text-sm font-medium text-[#16231F] hover:bg-[#FAF9F6] cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-sm font-medium text-[#0D221D] hover:bg-[#EFF7F3] cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               <span>Làm lại bộ này</span>
@@ -498,9 +498,9 @@ export function RemedialPracticePanel({
             <button
               type="button"
               onClick={onRegenerate}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E4D43] text-white text-sm font-semibold hover:bg-[#163B33] cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] cursor-pointer shadow-xs"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="w-4 h-4 text-[#E5C665]" />
               <span>Tạo bộ câu hỏi ôn tập mới</span>
             </button>
           </>

@@ -259,8 +259,11 @@ function AppShell() {
 
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
-        <div className="text-sm text-[#5C6561]">Đang khởi tạo Điểm 10...</div>
+      <div className="min-h-screen bg-[#F6F8F7] flex flex-col items-center justify-center gap-3">
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#E5C665] via-[#C89B2B] to-[#9E7514] text-[#093027] font-serif font-bold text-base flex items-center justify-center shadow-sm">
+          10
+        </div>
+        <div className="text-sm font-medium text-[#4A615A]">Đang khởi tạo Điểm 10...</div>
       </div>
     );
   }
@@ -315,7 +318,7 @@ function AppShell() {
     : undefined;
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#16231F] flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#F6F8F7] text-[#0D221D] flex flex-col lg:flex-row">
       <Sidebar
         activeTab={activeTab}
         onSelectTab={(tab) => {
@@ -334,18 +337,19 @@ function AppShell() {
         <div className="max-w-6xl mx-auto">
           {workspaceLoading && classes.length === 0 && exams.length === 0 ? (
             <div className="space-y-4">
-              <div className="h-8 w-48 bg-[#ECEAE4] rounded-lg animate-pulse" />
+              <div className="h-8 w-48 bg-[#E4ECE8] rounded-lg animate-pulse" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[1, 2, 3, 4].map((i) => (
                   <div
                     key={i}
-                    className="h-28 bg-white border border-[#E7E5DF] rounded-2xl animate-pulse"
+                    className="h-28 bg-white border border-[#DAE5E0] rounded-2xl animate-pulse"
                   />
                 ))}
               </div>
             </div>
           ) : activeTab === 'overview' ? (
             <OverviewView
+              teacherId={user.uid}
               classes={classes}
               exams={exams}
               submissions={submissions}

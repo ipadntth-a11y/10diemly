@@ -21,7 +21,14 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PHYSICS_12_QUESTIONS } from '../data/seedData';
-import { createExam, deleteExam, toggleExamPublish } from '../services/firestoreService';
+import {
+  createExam,
+  deleteExam,
+  deleteSubmission,
+  deleteSubmissionsBulk,
+  extractFriendlyFirestoreError,
+  toggleExamPublish,
+} from '../services/firestoreService';
 import type { Exam, ExamQuestion, QuestionType, Submission } from '../types';
 import {
   parseDocxExam,
@@ -88,6 +95,14 @@ export function ExamsView({
   const [parsingWord, setParsingWord] = useState(false);
   const [refiningWordAi, setRefiningWordAi] = useState(false);
 
+  // Submission deletion state (for pruning test runs / keeping clean analytics)
+  const [selectedSubIds, setSelectedSubIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [confirmDeleteSubId, setConfirmDeleteSubId] = useState<string | null>(null);
+  const [deletingSubId, setDeletingSubId] = useState<string | null>(null);
+  const [subActionError, setSubActionError] = useState<string | null>(null);
+
   useEffect(() => {
     if (openCreateModalSignal > 0) {
       setShowCreateModal(true);
@@ -97,6 +112,10 @@ export function ExamsView({
 
   useEffect(() => {
     setInspectedQuestionId(null);
+    setSelectedSubIds(new Set());
+    setConfirmBulkDelete(false);
+    setConfirmDeleteSubId(null);
+    setSubActionError(null);
   }, [selectedExamId]);
 
   const activeExam = exams.find((e) => e.id === selectedExamId) || null;
@@ -687,6 +706,45 @@ export function ExamsView({
       URL.revokeObjectURL(url);
     };
 
+    const handleDeleteSingleSub = async (subId: string) => {
+      setDeletingSubId(subId);
+      setSubActionError(null);
+      try {
+        await deleteSubmission(subId, teacherId);
+        setConfirmDeleteSubId(null);
+        setSelectedSubIds((prev) => {
+          if (!prev.has(subId)) return prev;
+          const next = new Set(prev);
+          next.delete(subId);
+          return next;
+        });
+      } catch (err) {
+        setSubActionError(extractFriendlyFirestoreError(err));
+      } finally {
+        setDeletingSubId(null);
+      }
+    };
+
+    const handleBulkDeleteSubs = async () => {
+      const ids = Array.from(selectedSubIds);
+      if (ids.length === 0) return;
+      setBulkDeleting(true);
+      setSubActionError(null);
+      try {
+        await deleteSubmissionsBulk(ids, teacherId);
+        setSelectedSubIds(new Set());
+        setConfirmBulkDelete(false);
+        setConfirmDeleteSubId(null);
+      } catch (err) {
+        setSubActionError(extractFriendlyFirestoreError(err));
+      } finally {
+        setBulkDeleting(false);
+      }
+    };
+
+    const allFilteredSelected =
+      filteredSubs.length > 0 && filteredSubs.every((s) => selectedSubIds.has(s.id));
+
     return (
       <div className="space-y-6">
         {/* Top back link & actions */}
@@ -694,7 +752,7 @@ export function ExamsView({
           <button
             type="button"
             onClick={() => onSelectExam(null)}
-            className="inline-flex items-center gap-1.5 text-sm text-[#434D49] hover:text-[#16231F] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#3A524A] hover:text-[#0A362C] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Danh sách đề</span>
@@ -707,7 +765,7 @@ export function ExamsView({
                 setEditingQuestionId(null);
                 setEditingExam(activeExam);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[#1E4D43] bg-white text-[#1E4D43] text-xs font-semibold hover:bg-[#E5ECE7] cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[#0F4C3F] bg-white text-[#0F4C3F] text-xs font-semibold hover:bg-[#EFF7F3] whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
               <span>Sửa đề &amp; đáp án</span>
@@ -716,25 +774,25 @@ export function ExamsView({
             <button
               type="button"
               onClick={() => setShowPhotoGrader(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#E5ECE7] text-[#1E4D43] text-xs font-semibold hover:bg-[#D5E3DA] cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] text-xs font-semibold hover:bg-[#FAF1D6] whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Camera className="w-3.5 h-3.5" />
+              <Camera className="w-3.5 h-3.5 text-[#B0831A]" />
               <span>Chấm ảnh chụp bằng AI</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleCopyCode(activeExam.examCode)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#DCD9D0] bg-white text-xs font-mono text-[#16231F] hover:bg-[#F5F4F0] cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#CEDCD6] bg-white text-xs font-mono text-[#0D221D] hover:bg-[#EFF7F3] whitespace-nowrap shrink-0 cursor-pointer"
             >
               {copiedCode === activeExam.examCode ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-[#16A34A]" />
+                  <Check className="w-3.5 h-3.5 text-[#0F6D4F]" />
                   <span>Đã chép mã {activeExam.examCode}</span>
                 </>
               ) : (
                 <>
-                  <Copy className="w-3.5 h-3.5 text-[#66706C]" />
+                  <Copy className="w-3.5 h-3.5 text-[#597169]" />
                   <span>Mã đề: {activeExam.examCode}</span>
                 </>
               )}
@@ -743,9 +801,9 @@ export function ExamsView({
             <button
               type="button"
               onClick={handleExportCSV}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[#DCD9D0] bg-white text-xs font-medium text-[#16231F] hover:bg-[#F5F4F0] cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] hover:bg-[#EFF7F3] whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5 text-[#0F4C3F]" />
               <span>Xuất CSV</span>
             </button>
           </div>
@@ -753,10 +811,13 @@ export function ExamsView({
 
         {/* Title & metadata */}
         <div>
-          <h1 className="font-serif text-3xl font-semibold text-[#16231F]">
+          <div className="text-[11px] font-semibold tracking-[0.12em] text-[#8A630D] uppercase">
+            Phân tích kết quả bài thi
+          </div>
+          <h1 className="font-serif text-3xl font-semibold text-[#0D221D] mt-1">
             {activeExam.title}
           </h1>
-          <div className="text-sm text-[#5C6561] mt-1.5 flex flex-wrap items-center gap-2 tabular-nums">
+          <div className="text-sm text-[#4A615A] mt-1.5 flex flex-wrap items-center gap-2 tabular-nums">
             <span>{activeExam.subject}</span>
             <span aria-hidden="true">·</span>
             <span>{activeExam.questionCount} câu</span>
@@ -769,46 +830,46 @@ export function ExamsView({
 
         {/* 4 KPI cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="bg-white border border-[#E7E5DF] rounded-2xl p-5 space-y-2">
-            <div className="text-xs font-medium tracking-[0.06em] text-[#66706C] uppercase">
+          <div className="bg-white border border-[#DAE5E0] rounded-2xl p-5 space-y-2 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
+            <div className="text-xs font-semibold tracking-[0.06em] text-[#597169] uppercase">
               Bài đã nộp
             </div>
-            <div className="font-serif text-3xl font-semibold text-[#16231F] tabular-nums">
+            <div className="font-serif text-3xl font-semibold text-[#0D221D] tabular-nums">
               {totalSubs}
             </div>
-            <div className="text-xs text-[#66706C]">0 em đang làm</div>
+            <div className="text-xs text-[#597169]">Dữ liệu thực tế đang ghi nhận</div>
           </div>
 
-          <div className="bg-white border border-[#E7E5DF] rounded-2xl p-5 space-y-2">
-            <div className="text-xs font-medium tracking-[0.06em] text-[#66706C] uppercase">
+          <div className="bg-gradient-to-br from-[#FFFFFF] via-[#FFFFFF] to-[#FDF8EB] border border-[#EAD8A6] rounded-2xl p-5 space-y-2 shadow-[0_1px_2px_rgba(200,155,43,0.08)]">
+            <div className="text-xs font-semibold tracking-[0.06em] text-[#8A630D] uppercase">
               Điểm trung bình
             </div>
-            <div className="font-serif text-3xl font-semibold text-[#16231F] tabular-nums">
+            <div className="font-serif text-3xl font-semibold text-[#0A362C] tabular-nums">
               {totalSubs > 0 ? avgScore.toFixed(2) : '0'}/10
             </div>
-            <div className="text-xs text-[#66706C]">Thang 10 điểm</div>
+            <div className="text-xs text-[#7A580B]">Thang 10 điểm</div>
           </div>
 
-          <div className="bg-white border border-[#E7E5DF] rounded-2xl p-5 space-y-2">
-            <div className="text-xs font-medium tracking-[0.06em] text-[#66706C] uppercase">
+          <div className="bg-white border border-[#DAE5E0] rounded-2xl p-5 space-y-2 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
+            <div className="text-xs font-semibold tracking-[0.06em] text-[#597169] uppercase">
               Tỉ lệ đạt (≥50%)
             </div>
-            <div className="font-serif text-3xl font-semibold text-[#16231F] tabular-nums">
+            <div className="font-serif text-3xl font-semibold text-[#0D221D] tabular-nums">
               {passRate}%
             </div>
-            <div className="text-xs text-[#66706C] tabular-nums">
+            <div className="text-xs text-[#597169] tabular-nums">
               {passCount}/{totalSubs} em
             </div>
           </div>
 
-          <div className="bg-white border border-[#E7E5DF] rounded-2xl p-5 space-y-2">
-            <div className="text-xs font-medium tracking-[0.06em] text-[#66706C] uppercase">
+          <div className="bg-white border border-[#DAE5E0] rounded-2xl p-5 space-y-2 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
+            <div className="text-xs font-semibold tracking-[0.06em] text-[#597169] uppercase">
               Chờ chấm tự luận
             </div>
-            <div className="font-serif text-3xl font-semibold text-[#16231F] tabular-nums">
+            <div className="font-serif text-3xl font-semibold text-[#0D221D] tabular-nums">
               {pendingEssay}
             </div>
-            <div className="text-xs text-[#66706C]">
+            <div className="text-xs text-[#597169]">
               {pendingEssay === 0 ? 'Đã chốt điểm' : 'Cần giáo viên duyệt'}
             </div>
           </div>
@@ -817,18 +878,18 @@ export function ExamsView({
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Chart 1: Phân bố điểm */}
-          <div className="lg:col-span-7 bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-5">
+          <div className="lg:col-span-7 bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-5 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
             <div>
-              <h2 className="font-serif text-lg font-semibold text-[#16231F]">
+              <h2 className="font-serif text-lg font-semibold text-[#0D221D]">
                 Phân bố điểm
               </h2>
-              <p className="text-xs text-[#66706C] mt-0.5">
+              <p className="text-xs text-[#597169] mt-0.5">
                 Số học sinh theo mức phần trăm điểm đạt được
               </p>
             </div>
 
             <div className="h-56 flex items-stretch gap-3 pt-2">
-              <div className="flex flex-col justify-between text-[11px] text-[#66706C] tabular-nums pb-7 text-right w-7 shrink-0">
+              <div className="flex flex-col justify-between text-[11px] text-[#597169] tabular-nums pb-7 text-right w-7 shrink-0">
                 <span>{yAxisMax}</span>
                 <span>{yAxisStep * 3}</span>
                 <span>{yAxisStep * 2}</span>
@@ -837,12 +898,12 @@ export function ExamsView({
               </div>
 
               <div className="flex-1 flex flex-col">
-                <div className="relative flex-1 flex items-end justify-around gap-3 border-b border-[#E7E5DF] px-2">
+                <div className="relative flex-1 flex items-end justify-around gap-3 border-b border-[#DAE5E0] px-2">
                   {[0, 25, 50, 75, 100].map((topPct) => (
                     <div
                       key={topPct}
                       style={{ top: `${topPct}%` }}
-                      className="absolute left-0 right-0 border-t border-dashed border-[#ECEAE4] pointer-events-none"
+                      className="absolute left-0 right-0 border-t border-dashed border-[#E6EEEA] pointer-events-none"
                     />
                   ))}
 
@@ -854,20 +915,20 @@ export function ExamsView({
                         key={b.label}
                         className="relative z-10 flex-1 max-w-14 h-full flex flex-col justify-end items-center group"
                       >
-                        <div className="text-[11px] font-medium text-[#1E4D43] mb-1 opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+                        <div className="text-[11px] font-semibold text-[#0F4C3F] mb-1 opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
                           {b.count} em
                         </div>
                         <div
                           style={{
                             height: b.count > 0 ? `${Math.max(heightPct, 6)}%` : '0%',
                           }}
-                          className="w-full bg-[#2B6B5E] rounded-t-lg transition-all duration-200 group-hover:bg-[#1E4D43]"
+                          className="w-full bg-[#0F4C3F] rounded-t-lg transition-all duration-200 group-hover:bg-[#0A362C]"
                         />
                       </div>
                     );
                   })}
                 </div>
-                <div className="flex justify-around gap-3 pt-2.5 text-xs text-[#5C6561]">
+                <div className="flex justify-around gap-3 pt-2.5 text-xs text-[#4A615A]">
                   {buckets.map((b) => (
                     <span key={b.label} className="flex-1 text-center truncate">
                       {b.label}
@@ -879,18 +940,18 @@ export function ExamsView({
           </div>
 
           {/* Chart 2: Điểm trung bình theo phần */}
-          <div className="lg:col-span-5 bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-5">
+          <div className="lg:col-span-5 bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-5 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
             <div>
-              <h2 className="font-serif text-lg font-semibold text-[#16231F]">
+              <h2 className="font-serif text-lg font-semibold text-[#0D221D]">
                 Điểm trung bình theo phần
               </h2>
-              <p className="text-xs text-[#66706C] mt-0.5">
+              <p className="text-xs text-[#597169] mt-0.5">
                 Phần nào cả lớp còn yếu nhất
               </p>
             </div>
 
             <div className="h-56 flex items-stretch gap-3 pt-2">
-              <div className="flex flex-col justify-between text-[11px] text-[#66706C] tabular-nums pb-7 text-right w-9 shrink-0">
+              <div className="flex flex-col justify-between text-[11px] text-[#597169] tabular-nums pb-7 text-right w-9 shrink-0">
                 <span>100%</span>
                 <span>75%</span>
                 <span>50%</span>
@@ -899,12 +960,12 @@ export function ExamsView({
               </div>
 
               <div className="flex-1 flex flex-col">
-                <div className="relative flex-1 flex items-end justify-around gap-4 border-b border-[#E7E5DF] px-2">
+                <div className="relative flex-1 flex items-end justify-around gap-4 border-b border-[#DAE5E0] px-2">
                   {[0, 25, 50, 75, 100].map((topPct) => (
                     <div
                       key={topPct}
                       style={{ top: `${topPct}%` }}
-                      className="absolute left-0 right-0 border-t border-dashed border-[#ECEAE4] pointer-events-none"
+                      className="absolute left-0 right-0 border-t border-dashed border-[#E6EEEA] pointer-events-none"
                     />
                   ))}
 
@@ -913,7 +974,7 @@ export function ExamsView({
                       key={part.label}
                       className="relative z-10 flex-1 max-w-14 h-full flex flex-col justify-end items-center group"
                     >
-                      <div className="text-[11px] font-semibold text-[#B45309] mb-1 tabular-nums">
+                      <div className="text-[11px] font-semibold text-[#8A630D] mb-1 tabular-nums">
                         {part.hasQuestions ? `${part.pct}%` : '—'}
                       </div>
                       <div
@@ -922,12 +983,12 @@ export function ExamsView({
                             ? `${Math.max(part.pct, 4)}%`
                             : '0%',
                         }}
-                        className="w-full bg-[#D98218] rounded-t-lg transition-all duration-200 group-hover:bg-[#B45309]"
+                        className="w-full bg-gradient-to-t from-[#B0831A] to-[#D6AE45] rounded-t-lg transition-all duration-200 group-hover:from-[#8A630D] group-hover:to-[#C89B2B]"
                       />
                     </div>
                   ))}
                 </div>
-                <div className="flex justify-around gap-4 pt-2.5 text-xs text-[#5C6561]">
+                <div className="flex justify-around gap-4 pt-2.5 text-xs text-[#4A615A]">
                   {partStats.map((part) => (
                     <span key={part.label} className="flex-1 text-center truncate">
                       {part.label}
@@ -940,13 +1001,13 @@ export function ExamsView({
         </div>
 
         {/* Per-question accuracy & response time drilldown */}
-        <section className="bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-5">
+        <section className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-5 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h2 className="font-serif text-lg font-semibold text-[#16231F]">
+              <h2 className="font-serif text-lg font-semibold text-[#0D221D]">
                 Tỉ lệ đúng &amp; thời gian trả lời theo từng câu
               </h2>
-              <p className="text-xs text-[#66706C] mt-0.5">
+              <p className="text-xs text-[#597169] mt-0.5">
                 Bấm vào bất kỳ câu nào để xem phân bố lựa chọn A/B/C/D và tốc độ từng học sinh.
               </p>
             </div>
@@ -956,9 +1017,9 @@ export function ExamsView({
             {questionStats.map((item) => {
               const barColor =
                 item.pct >= 70
-                  ? 'bg-[#16A34A]'
+                  ? 'bg-[#0F6D4F]'
                   : item.pct >= 45
-                    ? 'bg-[#D98218]'
+                    ? 'bg-[#C89B2B]'
                     : 'bg-[#DC2626]';
               const isSelected = inspectedQuestionId === item.question.id;
               return (
@@ -970,25 +1031,25 @@ export function ExamsView({
                   }
                   className={`text-left p-3 -mx-3 rounded-xl transition-colors cursor-pointer ${
                     isSelected
-                      ? 'bg-[#FAF9F6] ring-1 ring-[#1E4D43]/30'
-                      : 'hover:bg-[#FAF9F6]'
+                      ? 'bg-[#EFF7F3] ring-1 ring-[#0F4C3F]/35'
+                      : 'hover:bg-[#F8FAF9]'
                   }`}
                 >
                   <div className="flex items-center justify-between text-sm gap-2">
-                    <span className="text-[#16231F] font-medium">
+                    <span className="text-[#0D221D] font-medium">
                       Câu {item.question.index} · {item.typeLabel}
                     </span>
-                    <span className="font-semibold text-[#16231F] tabular-nums">
+                    <span className="font-semibold text-[#0D221D] tabular-nums">
                       {item.pct}%
                     </span>
                   </div>
-                  <div className="h-2 w-full rounded-full bg-[#ECEAE4] overflow-hidden my-1.5">
+                  <div className="h-2 w-full rounded-full bg-[#E6EEEA] overflow-hidden my-1.5">
                     <div
                       style={{ width: `${item.pct}%` }}
                       className={`h-full rounded-full ${barColor} transition-all duration-300`}
                     />
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#66706C] tabular-nums">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#597169] tabular-nums">
                     <span>
                       {item.question.type === 'mcq'
                         ? `${item.correctCount}/${item.totalSubs} em làm đúng`
@@ -1000,7 +1061,7 @@ export function ExamsView({
                         TB {item.avgSec}s
                       </span>
                       {item.fastGuessCount > 0 && (
-                        <span className="text-[#B45309] font-sans font-medium">
+                        <span className="text-[#8A630D] font-sans font-semibold">
                           · {item.fastGuessCount} em &lt;5s
                         </span>
                       )}
@@ -1013,15 +1074,15 @@ export function ExamsView({
 
           {/* Expanded Single Question Inspector */}
           {inspectedStat && (
-            <div className="mt-4 p-5 rounded-2xl bg-[#FAF9F6] border border-[#DCD9D0] space-y-4">
+            <div className="mt-4 p-5 rounded-2xl bg-[#F8FAF9] border border-[#CEDCD6] space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-xs font-semibold text-[#1E4D43] uppercase tracking-wider">
+                  <div className="text-xs font-semibold text-[#0F4C3F] uppercase tracking-wider">
                     Chi tiết Câu {inspectedStat.question.index} · {inspectedStat.typeLabel}
                   </div>
                   <MathText
                     text={inspectedStat.question.prompt}
-                    className="text-sm text-[#16231F] mt-1 leading-relaxed whitespace-pre-line"
+                    className="text-sm text-[#0D221D] mt-1 leading-relaxed whitespace-pre-line"
                   />
                   {inspectedStat.question.imageUrls &&
                     inspectedStat.question.imageUrls.length > 0 && (
@@ -1031,7 +1092,7 @@ export function ExamsView({
                             key={uIdx}
                             src={url}
                             alt={`Hình câu ${inspectedStat.question.index}`}
-                            className="max-h-36 rounded-lg border border-[#DCD9D0] bg-white object-contain"
+                            className="max-h-36 rounded-lg border border-[#CEDCD6] bg-white object-contain"
                           />
                         ))}
                       </div>
@@ -1044,7 +1105,7 @@ export function ExamsView({
                       setEditingQuestionId(inspectedStat.question.id);
                       setEditingExam(activeExam);
                     }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#1E4D43] bg-white text-[#1E4D43] text-xs font-semibold hover:bg-[#E5ECE7] cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#0F4C3F] bg-white text-[#0F4C3F] text-xs font-semibold hover:bg-[#EFF7F3] whitespace-nowrap cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Sửa câu này</span>
@@ -1052,7 +1113,7 @@ export function ExamsView({
                   <button
                     type="button"
                     onClick={() => setInspectedQuestionId(null)}
-                    className="p-1.5 rounded-lg text-[#66706C] hover:bg-[#ECEAE4] cursor-pointer"
+                    className="p-1.5 rounded-lg text-[#597169] hover:bg-[#E6EEEA] cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1060,21 +1121,21 @@ export function ExamsView({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div className="bg-white border border-[#E7E5DF] rounded-xl p-3">
-                  <div className="text-[#66706C]">Thời gian TB nhóm làm đúng</div>
-                  <div className="font-mono text-lg font-semibold text-[#16A34A] mt-0.5 tabular-nums">
+                <div className="bg-white border border-[#DAE5E0] rounded-xl p-3">
+                  <div className="text-[#597169]">Thời gian TB nhóm làm đúng</div>
+                  <div className="font-mono text-lg font-semibold text-[#0F6D4F] mt-0.5 tabular-nums">
                     {formatDurationMMSS(inspectedStat.avgRightSec)}
                   </div>
                 </div>
-                <div className="bg-white border border-[#E7E5DF] rounded-xl p-3">
-                  <div className="text-[#66706C]">Thời gian TB nhóm làm sai</div>
+                <div className="bg-white border border-[#DAE5E0] rounded-xl p-3">
+                  <div className="text-[#597169]">Thời gian TB nhóm làm sai</div>
                   <div className="font-mono text-lg font-semibold text-[#DC2626] mt-0.5 tabular-nums">
                     {formatDurationMMSS(inspectedStat.avgWrongSec)}
                   </div>
                 </div>
-                <div className="bg-white border border-[#E7E5DF] rounded-xl p-3">
-                  <div className="text-[#66706C]">Số lượt trả lời nhanh (&lt;5s)</div>
-                  <div className="font-mono text-lg font-semibold text-[#B45309] mt-0.5 tabular-nums">
+                <div className="bg-white border border-[#DAE5E0] rounded-xl p-3">
+                  <div className="text-[#597169]">Số lượt trả lời nhanh (&lt;5s)</div>
+                  <div className="font-mono text-lg font-semibold text-[#8A630D] mt-0.5 tabular-nums">
                     {inspectedStat.fastGuessCount} em
                   </div>
                 </div>
@@ -1082,8 +1143,8 @@ export function ExamsView({
 
               {inspectedStat.question.type === 'mcq' &&
                 inspectedStat.question.options && (
-                  <div className="bg-white border border-[#E7E5DF] rounded-xl p-4 space-y-2.5">
-                    <div className="text-xs font-semibold text-[#16231F]">
+                  <div className="bg-white border border-[#DAE5E0] rounded-xl p-4 space-y-2.5">
+                    <div className="text-xs font-semibold text-[#0D221D]">
                       Phân bố lựa chọn A / B / C / D của cả lớp
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1099,23 +1160,23 @@ export function ExamsView({
                             key={oIdx}
                             className={`p-2.5 rounded-lg border text-xs space-y-1 ${
                               isKey
-                                ? 'border-[#34A853] bg-[#F2FBF5]'
-                                : 'border-[#ECEAE4] bg-[#FAF9F6]'
+                                ? 'border-[#0F6D4F] bg-[#F0FBF6]'
+                                : 'border-[#EBF1EE] bg-[#F8FAF9]'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-medium text-[#16231F] min-w-0">
+                              <span className="font-medium text-[#0D221D] min-w-0">
                                 {OPTION_LETTERS[oIdx]}. <MathText text={optText} inline />
                               </span>
                               <span className="font-mono font-semibold tabular-nums shrink-0">
                                 {count} em ({pct}%)
                               </span>
                             </div>
-                            <div className="h-1.5 w-full bg-[#E7E5DF] rounded-full overflow-hidden">
+                            <div className="h-1.5 w-full bg-[#DAE5E0] rounded-full overflow-hidden">
                               <div
                                 style={{ width: `${pct}%` }}
                                 className={`h-full ${
-                                  isKey ? 'bg-[#16A34A]' : 'bg-[#7C8581]'
+                                  isKey ? 'bg-[#0F6D4F]' : 'bg-[#698078]'
                                 }`}
                               />
                             </div>
@@ -1127,8 +1188,8 @@ export function ExamsView({
                 )}
 
               {/* Student-level timing list for this question */}
-              <div className="bg-white border border-[#E7E5DF] rounded-xl p-4 space-y-2">
-                <div className="text-xs font-semibold text-[#16231F]">
+              <div className="bg-white border border-[#DAE5E0] rounded-xl p-4 space-y-2">
+                <div className="text-xs font-semibold text-[#0D221D]">
                   Chi tiết thời gian &amp; kết quả từng học sinh ở Câu{' '}
                   {inspectedStat.question.index}
                 </div>
@@ -1138,15 +1199,15 @@ export function ExamsView({
                       key={sb.submissionId}
                       type="button"
                       onClick={() => onSelectSubmission(sb.submissionId)}
-                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[#ECEAE4] hover:border-[#1E4D43] text-xs text-left cursor-pointer"
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-[#EBF1EE] hover:border-[#0F4C3F] text-xs text-left cursor-pointer"
                     >
-                      <span className="font-medium text-[#16231F] truncate">
+                      <span className="font-medium text-[#0D221D] truncate">
                         {sb.studentName}
                       </span>
                       <span className="flex items-center gap-2 shrink-0 font-mono tabular-nums">
                         <span
                           className={
-                            sb.isFast ? 'text-[#B45309] font-semibold' : 'text-[#5C6561]'
+                            sb.isFast ? 'text-[#8A630D] font-semibold' : 'text-[#4A615A]'
                           }
                         >
                           {sb.timeSpentSeconds}s{sb.isFast ? '!' : ''}
@@ -1154,7 +1215,7 @@ export function ExamsView({
                         <span
                           className={
                             sb.isCorrect
-                              ? 'text-[#16A34A] font-semibold'
+                              ? 'text-[#0F6D4F] font-semibold'
                               : 'text-[#DC2626] font-semibold'
                           }
                         >
@@ -1170,17 +1231,33 @@ export function ExamsView({
         </section>
 
         {/* Submissions list for this exam */}
-        <section className="bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-4">
+        <section className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-4 shadow-[0_1px_2px_rgba(10,54,44,0.03)]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="font-serif text-lg font-semibold text-[#16231F]">
-              Danh sách bài nộp ({filteredSubs.length})
-            </h2>
+            <div>
+              <h2 className="font-serif text-lg font-semibold text-[#0D221D]">
+                Danh sách bài nộp ({filteredSubs.length})
+              </h2>
+              <p className="text-xs text-[#597169] mt-0.5">
+                Có thể chọn và xoá bài làm thử nghiệm để điểm TB, biểu đồ và thống kê câu hỏi phản ánh đúng số liệu thật.
+              </p>
+            </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              {selectedSubIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmBulkDelete(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C] text-xs font-semibold hover:bg-[#FEE2E2] whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Xoá {selectedSubIds.size} bài đã chọn</span>
+                </button>
+              )}
+
               <select
                 value={classFilter}
                 onChange={(e) => setClassFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-xs font-medium text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                className="px-3 py-2 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-xs font-medium text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
               >
                 <option value="all">Tất cả các lớp</option>
                 {classOptions.map((c) => (
@@ -1191,58 +1268,131 @@ export function ExamsView({
               </select>
 
               <div className="relative">
-                <Search className="w-4 h-4 text-[#7C8581] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-[#698078] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchSub}
                   onChange={(e) => setSearchSub(e.target.value)}
                   placeholder="Tìm tên học sinh..."
-                  className="pl-9 pr-3 py-1.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm focus:outline-none focus:border-[#1E4D43] w-48"
+                  className="pl-9 pr-3 py-1.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm focus:outline-none focus:border-[#0F4C3F] w-48"
                 />
               </div>
             </div>
           </div>
 
+          {confirmBulkDelete && selectedSubIds.size > 0 && (
+            <div className="p-3.5 rounded-xl bg-[#FEF2F2] border border-[#FECACA] flex flex-wrap items-center justify-between gap-3 text-xs text-[#991B1B]">
+              <span>
+                Xác nhận xoá <strong>{selectedSubIds.size}</strong> bài nộp đã chọn để thu số liệu chuẩn? Điểm TB, biểu đồ phân bố và thống kê từng câu sẽ tự động tính lại.
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={bulkDeleting}
+                  onClick={handleBulkDeleteSubs}
+                  className="px-3 py-1.5 rounded-lg bg-[#B91C1C] text-white font-semibold hover:bg-[#991B1B] disabled:opacity-60 whitespace-nowrap cursor-pointer"
+                >
+                  {bulkDeleting ? 'Đang xoá...' : 'Xác nhận xoá'}
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkDeleting}
+                  onClick={() => setConfirmBulkDelete(false)}
+                  className="px-3 py-1.5 rounded-lg border border-[#FECACA] bg-white text-[#991B1B] font-medium hover:bg-[#FEF2F2] whitespace-nowrap cursor-pointer"
+                >
+                  Huỷ
+                </button>
+              </div>
+            </div>
+          )}
+
+          {subActionError && (
+            <div className="p-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#B91C1C]">
+              {subActionError}
+            </div>
+          )}
+
           {filteredSubs.length === 0 ? (
-            <div className="py-10 text-center text-sm text-[#66706C]">
+            <div className="py-10 text-center text-sm text-[#597169]">
               Chưa có bài nộp nào khớp bộ lọc.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#ECEAE4] text-xs font-medium text-[#66706C] uppercase tracking-wider">
+                  <tr className="border-b border-[#DAE5E0] text-xs font-semibold text-[#597169] uppercase tracking-wider">
+                    <th className="py-3 pr-3 w-8">
+                      <input
+                        type="checkbox"
+                        aria-label="Chọn tất cả bài nộp đang hiển thị"
+                        checked={allFilteredSelected}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedSubIds(new Set(filteredSubs.map((s) => s.id)));
+                          } else {
+                            setSelectedSubIds(new Set());
+                            setConfirmBulkDelete(false);
+                          }
+                        }}
+                        className="rounded border-[#CEDCD6] accent-[#0F4C3F] cursor-pointer"
+                      />
+                    </th>
                     <th className="py-3 pr-4">Họ tên</th>
                     <th className="py-3 pr-4">Lớp</th>
                     <th className="py-3 pr-4">Thời gian</th>
                     <th className="py-3 pr-4">Cảnh báo</th>
                     <th className="py-3 pr-4">Điểm</th>
-                    <th className="py-3 text-right">Chấm bài</th>
+                    <th className="py-3 text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#F0EEE8] text-sm">
+                <tbody className="divide-y divide-[#EDF3F0] text-sm">
                   {filteredSubs.map((sub) => {
                     const fastCount = sub.answers.filter(
                       (a) => a.timeSpentSeconds > 0 && a.timeSpentSeconds < 5
                     ).length;
+                    const isChecked = selectedSubIds.has(sub.id);
+                    const isConfirming = confirmDeleteSubId === sub.id;
+                    const isDeleting = deletingSubId === sub.id;
                     return (
                       <tr
                         key={sub.id}
                         onClick={() => onSelectSubmission(sub.id)}
-                        className="hover:bg-[#FAF9F6] transition-colors cursor-pointer"
+                        className={`transition-colors cursor-pointer ${
+                          isChecked ? 'bg-[#EFF7F3]' : 'hover:bg-[#F8FAF9]'
+                        }`}
                       >
-                        <td className="py-3.5 pr-4 font-medium text-[#16231F]">
+                        <td
+                          className="py-3.5 pr-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            aria-label={`Chọn bài của ${sub.studentName}`}
+                            checked={isChecked}
+                            onChange={(e) => {
+                              setSelectedSubIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(sub.id);
+                                else next.delete(sub.id);
+                                if (next.size === 0) setConfirmBulkDelete(false);
+                                return next;
+                              });
+                            }}
+                            className="rounded border-[#CEDCD6] accent-[#0F4C3F] cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-3.5 pr-4 font-medium text-[#0D221D]">
                           <div>{sub.studentName}</div>
                           {sub.studentCode && (
-                            <div className="text-[11px] font-mono text-[#66706C]">
+                            <div className="text-[11px] font-mono text-[#597169]">
                               Mã HS: {sub.studentCode}
                             </div>
                           )}
                         </td>
-                        <td className="py-3.5 pr-4 text-[#5C6561]">
+                        <td className="py-3.5 pr-4 text-[#4A615A]">
                           {sub.className || '—'}
                         </td>
-                        <td className="py-3.5 pr-4 font-mono text-xs text-[#434D49] tabular-nums">
+                        <td className="py-3.5 pr-4 font-mono text-xs text-[#3A524A] tabular-nums">
                           {formatDurationMMSS(sub.durationSeconds)}
                         </td>
                         <td className="py-3.5 pr-4 text-xs">
@@ -1251,25 +1401,66 @@ export function ExamsView({
                               {sub.violationCount} vi phạm · Ép buộc nộp
                             </span>
                           ) : sub.violationCount > 0 ? (
-                            <span className="text-[#B45309] font-medium">
+                            <span className="text-[#8A630D] font-medium">
                               {sub.violationCount} vi phạm
                             </span>
                           ) : fastCount > 0 ? (
-                            <span className="text-[#B45309]">
+                            <span className="text-[#8A630D]">
                               {fastCount} câu &lt;5s
                             </span>
                           ) : (
-                            <span className="text-[#66706C]">không vi phạm</span>
+                            <span className="text-[#597169]">không vi phạm</span>
                           )}
                         </td>
-                        <td className="py-3.5 pr-4 font-semibold tabular-nums text-[#16231F]">
+                        <td className="py-3.5 pr-4 font-semibold tabular-nums text-[#0D221D]">
                           {formatScore(sub.totalScore)}/{formatScore(sub.maxScore)}
                         </td>
-                        <td className="py-3.5 text-right">
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-[#1E4D43]">
-                            <span>Chi tiết</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </span>
+                        <td
+                          className="py-3.5 text-right"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {isConfirming ? (
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isDeleting}
+                                onClick={() => handleDeleteSingleSub(sub.id)}
+                                className="px-2.5 py-1 rounded-lg bg-[#B91C1C] text-white text-xs font-semibold hover:bg-[#991B1B] disabled:opacity-60 whitespace-nowrap cursor-pointer"
+                              >
+                                {isDeleting ? 'Đang xoá...' : 'Xoá'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isDeleting}
+                                onClick={() => setConfirmDeleteSubId(null)}
+                                className="px-2 py-1 rounded-lg border border-[#CEDCD6] bg-white text-xs font-medium text-[#4A615A] hover:bg-[#F8FAF9] whitespace-nowrap cursor-pointer"
+                              >
+                                Huỷ
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => onSelectSubmission(sub.id)}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-[#0F4C3F] hover:text-[#0A362C] whitespace-nowrap cursor-pointer"
+                              >
+                                <span>Chi tiết</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSubActionError(null);
+                                  setConfirmDeleteSubId(sub.id);
+                                }}
+                                title="Xoá bài làm này để thu số liệu chuẩn"
+                                className="p-1.5 rounded-lg text-[#597169] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1308,13 +1499,13 @@ export function ExamsView({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="text-xs font-medium tracking-[0.08em] text-[#66706C] uppercase">
+          <div className="text-[11px] font-semibold tracking-[0.12em] text-[#8A630D] uppercase">
             Ngân hàng đề &amp; chấm thi
           </div>
-          <h1 className="font-serif text-3xl font-semibold text-[#16231F] mt-1">
+          <h1 className="font-serif text-3xl font-semibold text-[#0D221D] mt-1">
             Đề &amp; bài chấm
           </h1>
-          <p className="text-sm text-[#5C6561] mt-1">
+          <p className="text-sm text-[#4A615A] mt-1">
             Soạn đề mới, theo dõi phân bố điểm, thời gian trả lời từng câu và chấm bài chụp tự luận bằng AI.
           </p>
         </div>
@@ -1323,9 +1514,9 @@ export function ExamsView({
           <button
             type="button"
             onClick={() => setShowPhotoGrader(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#1E4D43] bg-white text-[#1E4D43] text-sm font-medium hover:bg-[#E5ECE7] transition-colors whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] text-[#8A630D] text-sm font-semibold hover:bg-[#FAF1D6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Camera className="w-4 h-4" />
+            <Camera className="w-4 h-4 text-[#B0831A]" />
             <span>Chấm ảnh chụp bằng AI</span>
           </button>
 
@@ -1335,9 +1526,9 @@ export function ExamsView({
               setCreateMode('word');
               setShowCreateModal(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#DCD9D0] bg-white text-[#16231F] text-sm font-medium hover:bg-[#FAF9F6] transition-colors whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#CEDCD6] bg-white text-[#0D221D] text-sm font-medium hover:bg-[#EFF7F3] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <FileText className="w-4 h-4 text-[#1E4D43]" />
+            <FileText className="w-4 h-4 text-[#0F4C3F]" />
             <span>Đẩy đề Word (.docx)</span>
           </button>
 
@@ -1347,27 +1538,27 @@ export function ExamsView({
               setCreateMode('ai');
               setShowCreateModal(true);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors whitespace-nowrap cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-[#E5C665]" />
             <span>Soạn đề mới</span>
           </button>
         </div>
       </div>
 
       {exams.length === 0 ? (
-        <div className="bg-white border border-[#E7E5DF] rounded-2xl p-12 text-center space-y-3">
-          <BookOpen className="w-8 h-8 text-[#7C8581] mx-auto" />
-          <h2 className="font-serif text-xl font-semibold text-[#16231F]">
+        <div className="bg-white border border-[#DAE5E0] rounded-2xl p-12 text-center space-y-3">
+          <BookOpen className="w-8 h-8 text-[#698078] mx-auto" />
+          <h2 className="font-serif text-xl font-semibold text-[#0D221D]">
             Chưa có đề kiểm tra nào
           </h2>
-          <p className="text-sm text-[#5C6561]">
+          <p className="text-sm text-[#4A615A]">
             Tạo đề mới từ đề mẫu Vật lí 12 hoặc dùng Gemini AI sinh câu hỏi theo chủ đề.
           </p>
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] cursor-pointer"
           >
             Soạn đề đầu tiên
           </button>
@@ -1388,22 +1579,26 @@ export function ExamsView({
             return (
               <div
                 key={exam.id}
-                className="bg-white border border-[#E7E5DF] rounded-2xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-[#CFCBC0] transition-colors"
+                className="bg-white border border-[#DAE5E0] rounded-2xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-[#B5CEC3] transition-colors shadow-[0_1px_2px_rgba(10,54,44,0.03)]"
               >
                 <div className="space-y-1.5 min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <h2
                       onClick={() => onSelectExam(exam.id)}
-                      className="font-serif text-xl font-semibold text-[#16231F] hover:text-[#1E4D43] cursor-pointer"
+                      className="font-serif text-xl font-semibold text-[#0D221D] hover:text-[#0F4C3F] cursor-pointer"
                     >
                       {exam.title}
                     </h2>
-                    <span className="text-xs font-medium text-[#1E4D43]">
+                    <span
+                      className={`text-xs font-semibold ${
+                        exam.isPublished ? 'text-[#0F6D4F]' : 'text-[#8A630D]'
+                      }`}
+                    >
                       {exam.isPublished ? 'Đang mở' : 'Đã khoá'}
                     </span>
                   </div>
 
-                  <div className="text-xs text-[#66706C] flex flex-wrap items-center gap-2 tabular-nums">
+                  <div className="text-xs text-[#597169] flex flex-wrap items-center gap-2 tabular-nums">
                     <span>{exam.subject}</span>
                     <span aria-hidden="true">·</span>
                     <span>{exam.questionCount} câu</span>
@@ -1412,7 +1607,7 @@ export function ExamsView({
                     <span aria-hidden="true">·</span>
                     <span>{subCount} bài đã nộp</span>
                     <span aria-hidden="true">·</span>
-                    <span>ĐTB: {avg}/10</span>
+                    <span className="font-semibold text-[#8A630D]">ĐTB: {avg}/10</span>
                   </div>
                 </div>
 
@@ -1420,16 +1615,16 @@ export function ExamsView({
                   <button
                     type="button"
                     onClick={() => handleCopyCode(exam.examCode)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-xs font-mono text-[#16231F] hover:bg-[#F0EEE8] cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] text-xs font-mono font-semibold text-[#8A630D] hover:bg-[#FAF1D6] cursor-pointer"
                   >
                     {copiedCode === exam.examCode ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-[#16A34A]" />
+                        <Check className="w-3.5 h-3.5 text-[#0F6D4F]" />
                         <span>Đã chép</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5 text-[#66706C]" />
+                        <Copy className="w-3.5 h-3.5 text-[#B0831A]" />
                         <span>{exam.examCode}</span>
                       </>
                     )}
@@ -1442,7 +1637,7 @@ export function ExamsView({
                       setEditingExam(exam);
                     }}
                     title="Chỉnh sửa nội dung câu hỏi, đáp án, điểm số và tự luận"
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#1E4D43] bg-white text-[#1E4D43] text-xs font-medium hover:bg-[#E5ECE7] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0F4C3F] bg-white text-[#0F4C3F] text-xs font-semibold hover:bg-[#EFF7F3] transition-colors whitespace-nowrap cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                     <span>Sửa đề &amp; đáp án</span>
@@ -1452,12 +1647,12 @@ export function ExamsView({
                     type="button"
                     onClick={() => toggleExamPublish(exam.id, !exam.isPublished)}
                     title={exam.isPublished ? 'Khoá đề' : 'Mở đề cho học sinh'}
-                    className="p-2 rounded-xl border border-[#DCD9D0] bg-white text-[#434D49] hover:bg-[#FAF9F6] cursor-pointer"
+                    className="p-2 rounded-xl border border-[#CEDCD6] bg-white text-[#3A524A] hover:bg-[#EFF7F3] cursor-pointer"
                   >
                     {exam.isPublished ? (
-                      <Unlock className="w-4 h-4 text-[#1E4D43]" />
+                      <Unlock className="w-4 h-4 text-[#0F4C3F]" />
                     ) : (
-                      <Lock className="w-4 h-4 text-[#66706C]" />
+                      <Lock className="w-4 h-4 text-[#597169]" />
                     )}
                   </button>
 
@@ -1465,7 +1660,7 @@ export function ExamsView({
                     type="button"
                     onClick={() => deleteExam(exam.id)}
                     title="Xoá đề"
-                    className="p-2 rounded-xl border border-[#DCD9D0] bg-white text-[#66706C] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
+                    className="p-2 rounded-xl border border-[#CEDCD6] bg-white text-[#597169] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -1473,10 +1668,10 @@ export function ExamsView({
                   <button
                     type="button"
                     onClick={() => onSelectExam(exam.id)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-xs font-medium hover:bg-[#163B33] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] transition-colors whitespace-nowrap cursor-pointer"
                   >
                     <span>Phân tích &amp; bài nộp</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-3.5 h-3.5 text-[#E5C665]" />
                   </button>
                 </div>
               </div>
@@ -1487,29 +1682,29 @@ export function ExamsView({
 
       {/* Create Exam Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-[#E7E5DF] max-w-3xl w-full p-6 space-y-5 my-8 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-[#082B23]/45 backdrop-blur-[1px] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-[#DAE5E0] max-w-3xl w-full p-6 space-y-5 my-8 max-h-[92vh] overflow-y-auto shadow-xl">
             <div className="flex items-center justify-between">
-              <h3 className="font-serif text-2xl font-semibold text-[#16231F]">
+              <h3 className="font-serif text-2xl font-semibold text-[#0D221D]">
                 Soạn &amp; đẩy đề kiểm tra mới
               </h3>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="p-1.5 rounded-lg text-[#66706C] hover:bg-[#F5F4F0] cursor-pointer"
+                className="p-1.5 rounded-lg text-[#597169] hover:bg-[#EFF7F3] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-1 p-1 bg-[#F5F4F0] rounded-xl">
+            <div className="grid grid-cols-3 gap-1 p-1 bg-[#EFF7F3] rounded-xl">
               <button
                 type="button"
                 onClick={() => setCreateMode('word')}
                 className={`py-2 px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   createMode === 'word'
-                    ? 'bg-white text-[#1E4D43] shadow-sm font-semibold'
-                    : 'text-[#5C6561] hover:text-[#16231F]'
+                    ? 'bg-white text-[#0F4C3F] shadow-sm font-semibold'
+                    : 'text-[#4A615A] hover:text-[#0D221D]'
                 }`}
               >
                 Tải đề file Word (.docx)
@@ -1519,8 +1714,8 @@ export function ExamsView({
                 onClick={() => setCreateMode('ai')}
                 className={`py-2 px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   createMode === 'ai'
-                    ? 'bg-white text-[#1E4D43] shadow-sm font-semibold'
-                    : 'text-[#5C6561] hover:text-[#16231F]'
+                    ? 'bg-white text-[#0F4C3F] shadow-sm font-semibold'
+                    : 'text-[#4A615A] hover:text-[#0D221D]'
                 }`}
               >
                 Sinh đề theo chủ đề (AI)
@@ -1530,8 +1725,8 @@ export function ExamsView({
                 onClick={() => setCreateMode('template')}
                 className={`py-2 px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   createMode === 'template'
-                    ? 'bg-white text-[#1E4D43] shadow-sm font-semibold'
-                    : 'text-[#5C6561] hover:text-[#16231F]'
+                    ? 'bg-white text-[#0F4C3F] shadow-sm font-semibold'
+                    : 'text-[#4A615A] hover:text-[#0D221D]'
                 }`}
               >
                 Dùng đề mẫu 20 câu
@@ -1541,7 +1736,7 @@ export function ExamsView({
             <form onSubmit={handleSaveNewExam} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-medium text-[#434D49] mb-1">
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1">
                     Tên đề kiểm tra
                   </label>
                   <input
@@ -1553,11 +1748,11 @@ export function ExamsView({
                         ? 'Đề ôn tập mẫu — Vật lí 12'
                         : 'Ví dụ: Kiểm tra giữa kì I — Vật lí 12'
                     }
-                    className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                    className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#434D49] mb-1">
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1">
                     Thời gian (phút)
                   </label>
                   <input
@@ -1566,25 +1761,25 @@ export function ExamsView({
                     max={180}
                     value={newDuration}
                     onChange={(e) => setNewDuration(Number(e.target.value))}
-                    className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm tabular-nums focus:outline-none focus:border-[#1E4D43]"
+                    className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm tabular-nums focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
               </div>
 
               {createMode === 'word' && (
-                <div className="p-4 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-4">
+                <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="space-y-1">
-                      <div className="text-xs font-semibold text-[#16231F]">
+                      <div className="text-xs font-semibold text-[#0D221D]">
                         Đọc tự động đề thi từ Microsoft Word (.docx)
                       </div>
-                      <ul className="text-[11px] text-[#5C6561] space-y-0.5 leading-relaxed">
+                      <ul className="text-[11px] text-[#4A615A] space-y-0.5 leading-relaxed">
                         <li>
                           • <strong>Hình ảnh trong câu hỏi:</strong> tự động cắt &amp; nhúng thẳng vào đề thi học sinh.
                         </li>
                         <li>
                           • <strong>Trắc nghiệm &amp; Đúng/Sai:</strong> tự động đọc đáp án bằng{' '}
-                          <span className="underline font-semibold text-[#1E4D43]">gạch chân</span>{' '}
+                          <span className="underline font-semibold text-[#0F4C3F]">gạch chân</span>{' '}
                           (hoặc bảng đáp án cuối đề).
                         </li>
                         <li>
@@ -1592,12 +1787,12 @@ export function ExamsView({
                           <strong>Tự luận:</strong> tự tách mục <em>Hướng dẫn giải / Lời giải</em>.
                         </li>
                       </ul>
-                      <label className="inline-flex items-center gap-2 pt-1 text-[11px] font-medium text-[#1E4D43] cursor-pointer select-none">
+                      <label className="inline-flex items-center gap-2 pt-1 text-[11px] font-medium text-[#0F4C3F] cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={autoGenerateWordExplanations}
                           onChange={(e) => setAutoGenerateWordExplanations(e.target.checked)}
-                          className="rounded border-[#1E4D43] accent-[#1E4D43]"
+                          className="rounded border-[#0F4C3F] accent-[#0F4C3F]"
                         />
                         <span>
                           Tự động dùng AI viết lời giải chi tiết dựa trên đáp án cho các câu chưa có giải thích
@@ -1605,8 +1800,8 @@ export function ExamsView({
                       </label>
                     </div>
 
-                    <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E4D43] text-white text-xs font-semibold hover:bg-[#163B33] cursor-pointer shrink-0 self-start sm:self-center">
-                      <Upload className="w-4 h-4" />
+                    <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] cursor-pointer shrink-0 self-start sm:self-center">
+                      <Upload className="w-4 h-4 text-[#E5C665]" />
                       <span>
                         {parsingWord
                           ? 'Đang đọc file...'
@@ -1627,10 +1822,10 @@ export function ExamsView({
                   </div>
 
                   {wordResult && (
-                    <div className="pt-3 border-t border-[#E7E5DF] space-y-3">
+                    <div className="pt-3 border-t border-[#DAE5E0] space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-xs text-[#16231F] flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-[#1E4D43]">
+                        <div className="text-xs text-[#0D221D] flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-[#0F4C3F]">
                             {wordFileName}
                           </span>
                           <span>·</span>
@@ -1644,7 +1839,7 @@ export function ExamsView({
                           {wordResult.bottomAnswerCount > 0 && (
                             <>
                               <span>·</span>
-                              <span className="tabular-nums text-[#16A34A] font-medium">
+                              <span className="tabular-nums text-[#0F6D4F] font-medium">
                                 {wordResult.bottomAnswerCount} đáp án từ phần dưới đề
                               </span>
                             </>
@@ -1652,7 +1847,7 @@ export function ExamsView({
                           {wordResult.underlineAnswerCount > 0 && (
                             <>
                               <span>·</span>
-                              <span className="tabular-nums text-[#16A34A] font-medium">
+                              <span className="tabular-nums text-[#0F6D4F] font-medium">
                                 {wordResult.underlineAnswerCount} đáp án gạch chân
                               </span>
                             </>
@@ -1672,9 +1867,9 @@ export function ExamsView({
                                   overwriteAll: !hasMissing,
                                 });
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E5ECE7] text-[#1E4D43] text-xs font-semibold hover:bg-[#D5E3DA] disabled:opacity-60 cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] text-xs font-semibold hover:bg-[#FAF1D6] disabled:opacity-60 cursor-pointer"
                             >
-                              <Sparkles className="w-3.5 h-3.5" />
+                              <Sparkles className="w-3.5 h-3.5 text-[#B0831A]" />
                               <span>
                                 {generatingWordExplanations
                                   ? 'AI đang viết lời giải...'
@@ -1691,7 +1886,7 @@ export function ExamsView({
                             type="button"
                             disabled={refiningWordAi || generatingWordExplanations}
                             onClick={handleRefineWordWithAI}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1E4D43] bg-white text-[#1E4D43] text-xs font-semibold hover:bg-[#E5ECE7] disabled:opacity-60 cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#0F4C3F] bg-white text-[#0F4C3F] text-xs font-semibold hover:bg-[#EFF7F3] disabled:opacity-60 cursor-pointer"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
                             <span>
@@ -1704,7 +1899,7 @@ export function ExamsView({
                       </div>
 
                       {wordResult.warnings.length > 0 && (
-                        <div className="p-2.5 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] text-[11px] text-[#92400E] space-y-1">
+                        <div className="p-2.5 rounded-lg bg-[#FDF8EB] border border-[#EAD8A6] text-[11px] text-[#7A580B] space-y-1">
                           {wordResult.warnings.map((w, wIdx) => (
                             <div key={wIdx}>{w}</div>
                           ))}
@@ -1712,14 +1907,14 @@ export function ExamsView({
                       )}
 
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                        <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#ECEAE4]">
+                        <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#E6EEEA]">
                           <button
                             type="button"
                             onClick={() => setWordFilterMode('all')}
                             className={`px-2.5 py-1 rounded-md text-[11px] font-medium cursor-pointer ${
                               wordFilterMode === 'all'
-                                ? 'bg-white text-[#1E4D43] font-semibold shadow-sm'
-                                : 'text-[#5C6561] hover:text-[#16231F]'
+                                ? 'bg-white text-[#0F4C3F] font-semibold shadow-sm'
+                                : 'text-[#4A615A] hover:text-[#0D221D]'
                             }`}
                           >
                             Tất cả ({wordQuestions.length})
@@ -1729,8 +1924,8 @@ export function ExamsView({
                             onClick={() => setWordFilterMode('essay')}
                             className={`px-2.5 py-1 rounded-md text-[11px] font-medium cursor-pointer ${
                               wordFilterMode === 'essay'
-                                ? 'bg-white text-[#1E4D43] font-semibold shadow-sm'
-                                : 'text-[#5C6561] hover:text-[#16231F]'
+                                ? 'bg-white text-[#0F4C3F] font-semibold shadow-sm'
+                                : 'text-[#4A615A] hover:text-[#0D221D]'
                             }`}
                           >
                             Câu Tự luận ({wordQuestions.filter((w) => w.type === 'essay').length})
@@ -1740,7 +1935,7 @@ export function ExamsView({
                         <button
                           type="button"
                           onClick={handleAddEssayToWordQuestions}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#1E4D43] bg-white text-[#1E4D43] text-[11px] font-semibold hover:bg-[#E5ECE7] cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#0F4C3F] bg-white text-[#0F4C3F] text-[11px] font-semibold hover:bg-[#EFF7F3] cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Thêm câu tự luận</span>
@@ -1759,13 +1954,13 @@ export function ExamsView({
                                 key={q.id}
                                 className={`p-3.5 rounded-xl bg-white border space-y-2.5 ${
                                   q.needsReview
-                                    ? 'border-[#F59E0B]'
-                                    : 'border-[#E7E5DF]'
+                                    ? 'border-[#C89B2B]'
+                                    : 'border-[#DAE5E0]'
                                 }`}
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-xs font-bold text-[#16231F]">
+                                    <span className="text-xs font-bold text-[#0D221D]">
                                       Câu {q.index}
                                     </span>
                                     <select
@@ -1803,7 +1998,7 @@ export function ExamsView({
                                               : prev.statements,
                                         }));
                                       }}
-                                      className="px-2 py-1 rounded-lg border border-[#DCD9D0] bg-[#FAF9F6] text-[11px] font-medium text-[#16231F]"
+                                      className="px-2 py-1 rounded-lg border border-[#CEDCD6] bg-[#F8FAF9] text-[11px] font-medium text-[#0D221D]"
                                     >
                                       <option value="mcq">Trắc nghiệm</option>
                                       <option value="true_false">Đúng / Sai</option>
@@ -1814,29 +2009,29 @@ export function ExamsView({
                                     </select>
 
                                     {q.answerSource === 'underline' && (
-                                      <span className="text-[11px] font-medium text-[#16A34A]">
+                                      <span className="text-[11px] font-medium text-[#0F6D4F]">
                                         · Đọc từ gạch chân
                                       </span>
                                     )}
                                     {q.answerSource === 'table' && (
-                                      <span className="text-[11px] font-medium text-[#16A34A]">
+                                      <span className="text-[11px] font-medium text-[#0F6D4F]">
                                         · Đọc từ đáp án dưới đề
                                       </span>
                                     )}
                                     {q.answerSource === 'explicit' && (
-                                      <span className="text-[11px] font-medium text-[#16A34A]">
+                                      <span className="text-[11px] font-medium text-[#0F6D4F]">
                                         · Đọc từ đáp án/lời giải
                                       </span>
                                     )}
                                     {q.needsReview && (
-                                      <span className="text-[11px] font-medium text-[#B45309]">
+                                      <span className="text-[11px] font-medium text-[#8A630D]">
                                         · Cần kiểm tra đáp án
                                       </span>
                                     )}
                                   </div>
 
                                   <div className="flex items-center gap-2 text-[11px]">
-                                    <label className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#DCD9D0] bg-[#FAF9F6] text-[#434D49] hover:text-[#1E4D43] cursor-pointer">
+                                    <label className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#CEDCD6] bg-[#F8FAF9] text-[#3A524A] hover:text-[#0F4C3F] cursor-pointer">
                                       <ImageIcon className="w-3 h-3" />
                                       <span>+ Ảnh đề</span>
                                       <input
@@ -1865,14 +2060,14 @@ export function ExamsView({
                                           maxScore: Number(e.target.value) || 0.25,
                                         }))
                                       }
-                                      className="w-14 px-1.5 py-1 rounded-lg border border-[#DCD9D0] text-center font-mono tabular-nums"
+                                      className="w-14 px-1.5 py-1 rounded-lg border border-[#CEDCD6] text-center font-mono tabular-nums"
                                     />
-                                    <span className="text-[#66706C]">đ</span>
+                                    <span className="text-[#597169]">đ</span>
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteWordQuestion(qIdx)}
                                       title="Xoá câu hỏi này"
-                                      className="p-1 rounded-lg text-[#66706C] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
+                                      className="p-1 rounded-lg text-[#597169] hover:text-[#B91C1C] hover:bg-[#FEF2F2] cursor-pointer"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -1880,7 +2075,7 @@ export function ExamsView({
                                 </div>
 
                                 <div>
-                                  <label className="block text-[11px] font-medium text-[#5C6561] mb-1">
+                                  <label className="block text-[11px] font-medium text-[#4A615A] mb-1">
                                     Nội dung câu hỏi:
                                   </label>
                                   <textarea
@@ -1893,10 +2088,10 @@ export function ExamsView({
                                       }))
                                     }
                                     placeholder="Nhập hoặc chỉnh sửa nội dung đề bài (hỗ trợ $...$ LaTeX)..."
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#DCD9D0] bg-[#FAF9F6] text-xs text-[#16231F] leading-relaxed focus:outline-none focus:border-[#1E4D43]"
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#CEDCD6] bg-[#F8FAF9] text-xs text-[#0D221D] leading-relaxed focus:outline-none focus:border-[#0F4C3F]"
                                   />
                                   {containsLatexFormula(q.prompt) && (
-                                    <div className="mt-1 p-2 rounded-lg bg-[#FAF9F6] border border-[#E7E5DF] text-xs text-[#16231F]">
+                                    <div className="mt-1 p-2 rounded-lg bg-[#F8FAF9] border border-[#DAE5E0] text-xs text-[#0D221D]">
                                       <MathText
                                         text={q.prompt}
                                         className="whitespace-pre-line leading-relaxed"
@@ -1912,7 +2107,7 @@ export function ExamsView({
                                         <img
                                           src={url}
                                           alt={`Ảnh câu ${q.index}`}
-                                          className="max-h-28 rounded-lg border border-[#DCD9D0] object-contain bg-white"
+                                          className="max-h-28 rounded-lg border border-[#CEDCD6] object-contain bg-white"
                                         />
                                         <button
                                           type="button"
@@ -1951,8 +2146,8 @@ export function ExamsView({
                                           }
                                           className={`text-left px-2.5 py-1.5 rounded-lg border text-[11px] flex items-center gap-1.5 cursor-pointer ${
                                             active
-                                              ? 'border-[#16A34A] bg-[#F2FBF5] text-[#166534] font-semibold'
-                                              : 'border-[#ECEAE4] bg-[#FAF9F6] text-[#434D49]'
+                                              ? 'border-[#0F6D4F] bg-[#F0FBF6] text-[#0A362C] font-semibold'
+                                              : 'border-[#EBF1EE] bg-[#F8FAF9] text-[#3A524A]'
                                           }`}
                                         >
                                           <span className="font-mono font-bold">
@@ -1970,9 +2165,9 @@ export function ExamsView({
                                     {q.statements.map((st, sIdx) => (
                                       <div
                                         key={sIdx}
-                                        className="flex items-center justify-between gap-2 text-[11px] px-2.5 py-1.5 rounded-lg bg-[#FAF9F6] border border-[#ECEAE4]"
+                                        className="flex items-center justify-between gap-2 text-[11px] px-2.5 py-1.5 rounded-lg bg-[#F8FAF9] border border-[#EBF1EE]"
                                       >
-                                        <span className="text-[#16231F] min-w-0">
+                                        <span className="text-[#0D221D] min-w-0">
                                           <strong>{'abcd'[sIdx]})</strong>{' '}
                                           <MathText text={st.text} inline />
                                         </span>
@@ -1992,7 +2187,7 @@ export function ExamsView({
                                           }
                                           className={`px-2 py-0.5 rounded font-semibold shrink-0 cursor-pointer ${
                                             st.isTrue
-                                              ? 'bg-[#DCFCE7] text-[#166534]'
+                                              ? 'bg-[#DCFCE7] text-[#0A362C]'
                                               : 'bg-[#FEE2E2] text-[#991B1B]'
                                           }`}
                                         >
@@ -2005,7 +2200,7 @@ export function ExamsView({
 
                                 {q.type === 'short_answer' && (
                                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                                    <span className="text-[#5C6561]">
+                                    <span className="text-[#4A615A]">
                                       Đáp số 4 ô:
                                     </span>
                                     <input
@@ -2020,14 +2215,14 @@ export function ExamsView({
                                         }))
                                       }
                                       placeholder="VD: 2,5"
-                                      className="w-24 px-2.5 py-1 rounded-lg border border-[#DCD9D0] font-mono text-xs font-semibold text-[#1E4D43]"
+                                      className="w-24 px-2.5 py-1 rounded-lg border border-[#CEDCD6] font-mono text-xs font-semibold text-[#0F4C3F]"
                                     />
                                   </div>
                                 )}
 
                                 {q.type === 'essay' && (
                                   <div>
-                                    <label className="block text-[11px] font-medium text-[#5C6561] mb-1">
+                                    <label className="block text-[11px] font-medium text-[#4A615A] mb-1">
                                       Đáp án chuẩn / Barem chấm (AI dùng để chấm bài chụp):
                                     </label>
                                     <input
@@ -2041,19 +2236,19 @@ export function ExamsView({
                                         }))
                                       }
                                       placeholder="VD: p2 = 300 kPa; m = 12 g (ý a: 0,5đ, ý b: 0,5đ)"
-                                      className="w-full px-2.5 py-1.5 rounded-lg border border-[#DCD9D0] bg-[#FAF9F6] text-[11px] text-[#16231F] focus:outline-none focus:border-[#1E4D43]"
+                                      className="w-full px-2.5 py-1.5 rounded-lg border border-[#CEDCD6] bg-[#F8FAF9] text-[11px] text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
                                     />
                                   </div>
                                 )}
 
                                 <div>
                                   <div className="flex items-center justify-between gap-2 mb-1">
-                                    <label className="block text-[11px] font-medium text-[#5C6561]">
+                                    <label className="block text-[11px] font-medium text-[#4A615A]">
                                       {q.type === 'essay'
                                         ? 'Hướng dẫn giải chi tiết (Tự luận):'
                                         : 'Lời giải / ghi chú:'}
                                     </label>
-                                    <label className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[#DCD9D0] bg-[#FAF9F6] text-[10px] text-[#434D49] hover:text-[#1E4D43] cursor-pointer">
+                                    <label className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[#CEDCD6] bg-[#F8FAF9] text-[10px] text-[#3A524A] hover:text-[#0F4C3F] cursor-pointer">
                                       <ImageIcon className="w-3 h-3" />
                                       <span>+ Ảnh lời giải</span>
                                       <input
@@ -2085,10 +2280,10 @@ export function ExamsView({
                                       }))
                                     }
                                     placeholder="Nhập hoặc chỉnh sửa hướng dẫn giải cho câu này (hỗ trợ $...$ LaTeX)..."
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#DCD9D0] bg-[#FAF9F6] text-[11px] focus:outline-none focus:border-[#1E4D43]"
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#CEDCD6] bg-[#F8FAF9] text-[11px] focus:outline-none focus:border-[#0F4C3F]"
                                   />
                                   {containsLatexFormula(q.explanation) && (
-                                    <div className="mt-1 p-2 rounded-lg bg-[#F4FAF6] border border-[#D4ECDC] text-[11px] text-[#1F3A2B]">
+                                    <div className="mt-1 p-2 rounded-lg bg-[#EFF7F3] border border-[#C5DDD3] text-[11px] text-[#0D221D]">
                                       <MathText
                                         text={q.explanation}
                                         className="whitespace-pre-line leading-relaxed"
@@ -2103,7 +2298,7 @@ export function ExamsView({
                                             <img
                                               src={url}
                                               alt={`Ảnh lời giải câu ${q.index}`}
-                                              className="max-h-24 rounded-lg border border-[#DCD9D0] object-contain bg-white"
+                                              className="max-h-24 rounded-lg border border-[#CEDCD6] object-contain bg-white"
                                             />
                                             <button
                                               type="button"
@@ -2129,7 +2324,7 @@ export function ExamsView({
                             ))}
                           {wordFilterMode === 'essay' &&
                             wordQuestions.filter((w) => w.type === 'essay').length === 0 && (
-                              <div className="p-4 rounded-xl bg-white border border-[#E7E5DF] text-center text-xs text-[#5C6561]">
+                              <div className="p-4 rounded-xl bg-white border border-[#DAE5E0] text-center text-xs text-[#4A615A]">
                                 Chưa có câu tự luận nào trong danh sách. Bạn có thể chuyển loại câu hỏi sang &ldquo;Tự luận&rdquo; ở tab Tất cả hoặc nhấn &ldquo;+ Thêm câu tự luận&rdquo;.
                               </div>
                             )}
@@ -2141,35 +2336,35 @@ export function ExamsView({
               )}
 
               {createMode === 'ai' && (
-                <div className="p-4 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-3.5">
+                <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-3.5">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-[#434D49] mb-1">
+                      <label className="block text-xs font-medium text-[#3A524A] mb-1">
                         Môn học
                       </label>
                       <input
                         type="text"
                         value={newSubject}
                         onChange={(e) => setNewSubject(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-[#DCD9D0] bg-white text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-[#CEDCD6] bg-white text-sm"
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-[#434D49] mb-1">
+                      <label className="block text-xs font-medium text-[#3A524A] mb-1">
                         Chủ đề / Nội dung kiến thức
                       </label>
                       <input
                         type="text"
                         value={aiTopic}
                         onChange={(e) => setAiTopic(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-[#DCD9D0] bg-white text-sm"
+                        className="w-full px-3 py-2 rounded-lg border border-[#CEDCD6] bg-white text-sm"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs text-[#5C6561] mb-1">
+                      <label className="block text-xs text-[#4A615A] mb-1">
                         Trắc nghiệm
                       </label>
                       <input
@@ -2178,11 +2373,11 @@ export function ExamsView({
                         max={12}
                         value={aiMcqCount}
                         onChange={(e) => setAiMcqCount(Number(e.target.value))}
-                        className="w-full px-3 py-1.5 rounded-lg border border-[#DCD9D0] bg-white text-sm tabular-nums"
+                        className="w-full px-3 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-sm tabular-nums"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-[#5C6561] mb-1">
+                      <label className="block text-xs text-[#4A615A] mb-1">
                         Đúng / Sai
                       </label>
                       <input
@@ -2191,11 +2386,11 @@ export function ExamsView({
                         max={4}
                         value={aiTfCount}
                         onChange={(e) => setAiTfCount(Number(e.target.value))}
-                        className="w-full px-3 py-1.5 rounded-lg border border-[#DCD9D0] bg-white text-sm tabular-nums"
+                        className="w-full px-3 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-sm tabular-nums"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-[#5C6561] mb-1">
+                      <label className="block text-xs text-[#4A615A] mb-1">
                         Trả lời ngắn
                       </label>
                       <input
@@ -2204,11 +2399,11 @@ export function ExamsView({
                         max={4}
                         value={aiShortCount}
                         onChange={(e) => setAiShortCount(Number(e.target.value))}
-                        className="w-full px-3 py-1.5 rounded-lg border border-[#DCD9D0] bg-white text-sm tabular-nums"
+                        className="w-full px-3 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-sm tabular-nums"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-[#5C6561] mb-1">
+                      <label className="block text-xs text-[#4A615A] mb-1">
                         Tự luận
                       </label>
                       <input
@@ -2217,7 +2412,7 @@ export function ExamsView({
                         max={4}
                         value={aiEssayCount}
                         onChange={(e) => setAiEssayCount(Number(e.target.value))}
-                        className="w-full px-3 py-1.5 rounded-lg border border-[#DCD9D0] bg-white text-sm tabular-nums"
+                        className="w-full px-3 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-sm tabular-nums"
                       />
                     </div>
                   </div>
@@ -2226,28 +2421,28 @@ export function ExamsView({
                     type="button"
                     disabled={generating}
                     onClick={handleGenerateWithAI}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[#1E4D43] text-[#1E4D43] bg-white text-xs font-semibold hover:bg-[#E5ECE7] transition-colors disabled:opacity-60 cursor-pointer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-[#EAD8A6] text-[#8A630D] bg-[#FDF8EB] text-xs font-semibold hover:bg-[#FAF1D6] transition-colors disabled:opacity-60 cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Sparkles className="w-3.5 h-3.5 text-[#B0831A]" />
                     <span>
                       {generating ? 'Đang sinh câu hỏi...' : 'Sinh câu hỏi bằng AI'}
                     </span>
                   </button>
 
                   {previewQuestions && (
-                    <div className="pt-3 space-y-2.5 max-h-72 overflow-y-auto border-t border-[#E7E5DF]">
+                    <div className="pt-3 space-y-2.5 max-h-72 overflow-y-auto border-t border-[#DAE5E0]">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-semibold text-[#1E4D43]">
+                        <div className="text-xs font-semibold text-[#0F4C3F]">
                           Đã sinh {previewQuestions.length} câu hỏi (chỉnh sửa trực tiếp nếu cần):
                         </div>
                       </div>
                       {previewQuestions.map((q, idx) => (
                         <div
                           key={q.id}
-                          className="text-xs text-[#434D49] bg-white p-3 rounded-lg border border-[#E7E5DF] space-y-2"
+                          className="text-xs text-[#3A524A] bg-white p-3 rounded-lg border border-[#DAE5E0] space-y-2"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold text-[#16231F]">
+                            <span className="font-semibold text-[#0D221D]">
                               Câu {q.index} ·{' '}
                               {q.type === 'essay'
                                 ? 'Tự luận'
@@ -2257,7 +2452,7 @@ export function ExamsView({
                                     ? 'Trả lời ngắn'
                                     : 'Trắc nghiệm'}
                             </span>
-                            <span className="text-[11px] text-[#66706C] tabular-nums">
+                            <span className="text-[11px] text-[#597169] tabular-nums">
                               {q.maxScore} điểm
                             </span>
                           </div>
@@ -2273,10 +2468,10 @@ export function ExamsView({
                                   : prev
                               )
                             }
-                            className="w-full px-2 py-1 rounded border border-[#DCD9D0] bg-[#FAF9F6] text-xs text-[#16231F]"
+                            className="w-full px-2 py-1 rounded border border-[#CEDCD6] bg-[#F8FAF9] text-xs text-[#0D221D]"
                           />
                           {containsLatexFormula(q.prompt) && (
-                            <div className="p-2 rounded bg-[#FAF9F6] border border-[#E7E5DF] text-xs text-[#16231F]">
+                            <div className="p-2 rounded bg-[#F8FAF9] border border-[#DAE5E0] text-xs text-[#0D221D]">
                               <MathText
                                 text={q.prompt}
                                 className="whitespace-pre-line leading-relaxed"
@@ -2300,7 +2495,7 @@ export function ExamsView({
                                   )
                                 }
                                 placeholder="Đáp án chuẩn / Barem chấm tự luận..."
-                                className="w-full px-2 py-1 rounded border border-[#DCD9D0] bg-[#FAF9F6] text-[11px]"
+                                className="w-full px-2 py-1 rounded border border-[#CEDCD6] bg-[#F8FAF9] text-[11px]"
                               />
                               <textarea
                                 rows={2}
@@ -2317,10 +2512,10 @@ export function ExamsView({
                                   )
                                 }
                                 placeholder="Hướng dẫn giải chi tiết câu tự luận..."
-                                className="w-full px-2 py-1 rounded border border-[#DCD9D0] bg-[#FAF9F6] text-[11px]"
+                                className="w-full px-2 py-1 rounded border border-[#CEDCD6] bg-[#F8FAF9] text-[11px]"
                               />
                               {containsLatexFormula(q.explanation) && (
-                                <div className="p-2 rounded bg-[#F4FAF6] border border-[#D4ECDC] text-[11px] text-[#1F3A2B]">
+                                <div className="p-2 rounded bg-[#EFF7F3] border border-[#C5DDD3] text-[11px] text-[#0D221D]">
                                   <MathText
                                     text={q.explanation}
                                     className="whitespace-pre-line leading-relaxed"
@@ -2337,7 +2532,7 @@ export function ExamsView({
               )}
 
               {createMode === 'template' && (
-                <div className="p-4 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] text-sm text-[#434D49]">
+                <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] text-sm text-[#3A524A]">
                   Đề mẫu gồm <strong>20 câu Vật lí 12 (HK1)</strong> chuẩn cấu trúc mới: 12 câu Trắc nghiệm, 4 câu Đúng/Sai, 3 câu Trả lời ngắn (4 ô điền số) và 1 câu Tự luận có Hướng dẫn giải chi tiết.
                 </div>
               )}
@@ -2352,7 +2547,7 @@ export function ExamsView({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-xl border border-[#DCD9D0] text-sm font-medium text-[#434D49] hover:bg-[#F5F4F0] cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#F8FAF9] cursor-pointer"
                 >
                   Huỷ
                 </button>
@@ -2364,7 +2559,7 @@ export function ExamsView({
                     refiningWordAi ||
                     generatingWordExplanations
                   }
-                  className="px-5 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] disabled:opacity-60 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer"
                 >
                   {generating
                     ? 'Đang xử lý...'

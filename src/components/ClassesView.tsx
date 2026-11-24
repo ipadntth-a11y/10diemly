@@ -273,13 +273,13 @@ export function ClassesView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="text-xs font-medium tracking-[0.08em] text-[#66706C] uppercase">
+          <div className="text-xs font-semibold tracking-[0.12em] text-[#8A630D] uppercase">
             Quản lý lớp học
           </div>
-          <h1 className="font-serif text-3xl font-semibold text-[#16231F] mt-1">
+          <h1 className="font-serif text-3xl font-semibold text-[#0D221D] mt-1">
             Lớp &amp; học sinh
           </h1>
-          <p className="text-sm text-[#5C6561] mt-1">
+          <p className="text-sm text-[#4A615A] mt-1">
             Tạo lớp, nhập danh sách học sinh và cập nhật số điện thoại phụ huynh.
           </p>
         </div>
@@ -290,9 +290,9 @@ export function ClassesView({
             setCreateClassError(null);
             setShowCreateClass(true);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F4C3F] border border-[#C89B2B]/40 text-white text-sm font-medium hover:bg-[#0A362C] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4 text-[#E5C665]" />
           <span>Tạo lớp mới</span>
         </button>
       </div>
@@ -312,12 +312,12 @@ export function ClassesView({
 
       {/* Class tabs */}
       {classes.length === 0 ? (
-        <div className="bg-white border border-[#E7E5DF] rounded-2xl p-10 text-center space-y-3">
-          <Users className="w-8 h-8 text-[#7C8581] mx-auto" />
-          <h2 className="font-serif text-xl font-semibold text-[#16231F]">
+        <div className="bg-white border border-[#DAE5E0] rounded-2xl p-10 text-center space-y-3">
+          <Users className="w-8 h-8 text-[#698078] mx-auto" />
+          <h2 className="font-serif text-xl font-semibold text-[#0D221D]">
             Chưa có lớp học nào
           </h2>
-          <p className="text-sm text-[#5C6561] max-w-md mx-auto">
+          <p className="text-sm text-[#4A615A] max-w-md mx-auto">
             Tạo lớp học đầu tiên để bắt đầu quản lý danh sách học sinh và giao đề kiểm tra.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
@@ -327,7 +327,7 @@ export function ClassesView({
                 setCreateClassError(null);
                 setShowCreateClass(true);
               }}
-              className="px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-medium hover:bg-[#0A362C] cursor-pointer"
             >
               Tạo lớp đầu tiên
             </button>
@@ -345,7 +345,7 @@ export function ClassesView({
                   setSeedingSample(false);
                 }
               }}
-              className="px-4 py-2 rounded-xl border border-[#DCD9D0] bg-white text-[#16231F] text-sm font-medium hover:bg-[#FAF9F6] disabled:opacity-60 cursor-pointer"
+              className="px-4 py-2 rounded-xl border border-[#CEDCD6] bg-white text-[#0D221D] text-sm font-medium hover:bg-[#F8FAF9] disabled:opacity-60 cursor-pointer"
             >
               {seedingSample ? 'Đang tạo dữ liệu lớp...' : 'Khởi tạo dữ liệu lớp mẫu'}
             </button>
@@ -361,16 +361,16 @@ export function ClassesView({
                 onClick={() => setSelectedClassId(cls.id)}
                 className={`rounded-2xl p-5 border transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-white border-[#1E4D43] ring-1 ring-[#1E4D43]/20'
-                    : 'bg-white border-[#E7E5DF] hover:border-[#CFCBC0]'
+                    ? 'bg-gradient-to-br from-white to-[#EFF7F3] border-[#0F4C3F] ring-1 ring-[#C89B2B]/50'
+                    : 'bg-white border-[#DAE5E0] hover:border-[#A8C1B6]'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-serif text-xl font-semibold text-[#16231F]">
+                    <h3 className="font-serif text-xl font-semibold text-[#0D221D]">
                       Lớp {cls.name}
                     </h3>
-                    <p className="text-xs text-[#66706C] mt-0.5">
+                    <p className="text-xs text-[#597169] mt-0.5">
                       {cls.subject} · {cls.grade || 'THPT'}
                     </p>
                   </div>
@@ -381,14 +381,14 @@ export function ClassesView({
                       handleDeleteClass(cls.id);
                     }}
                     title="Xoá lớp"
-                    className="p-1.5 rounded-lg text-[#8C9590] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg text-[#698078] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-[#F0EEE8] flex items-center justify-between text-xs">
-                  <span className="text-[#434D49] font-medium tabular-nums">
+                <div className="mt-4 pt-3 border-t border-[#EBF1EE] flex items-center justify-between text-xs">
+                  <span className="text-[#3A524A] font-medium tabular-nums">
                     {isSelected ? students.length : cls.studentCount} học sinh
                   </span>
                   <button
@@ -397,16 +397,16 @@ export function ClassesView({
                       e.stopPropagation();
                       handleCopyCode(cls.joinCode);
                     }}
-                    className="inline-flex items-center gap-1.5 text-[#1E4D43] font-mono hover:underline cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-[#0F4C3F] font-mono font-medium hover:text-[#8A630D] cursor-pointer"
                   >
                     {copiedCode === cls.joinCode ? (
                       <>
-                        <Check className="w-3.5 h-3.5" />
+                        <Check className="w-3.5 h-3.5 text-[#0F6D4F]" />
                         <span>Đã chép</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5" />
+                        <Copy className="w-3.5 h-3.5 text-[#8A630D]" />
                         <span>Mã: {cls.joinCode}</span>
                       </>
                     )}
@@ -420,13 +420,13 @@ export function ClassesView({
 
       {/* Selected Class Roster */}
       {activeClass && (
-        <section className="bg-white border border-[#E7E5DF] rounded-2xl p-6 space-y-5">
+        <section className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h2 className="font-serif text-xl font-semibold text-[#16231F]">
+              <h2 className="font-serif text-xl font-semibold text-[#0D221D]">
                 Danh sách học sinh — Lớp {activeClass.name}
               </h2>
-              <div className="text-xs text-[#66706C] mt-1 flex flex-wrap items-center gap-2">
+              <div className="text-xs text-[#597169] mt-1 flex flex-wrap items-center gap-2">
                 <span>
                   {students.length} học sinh · Môn {activeClass.subject} · Năm học{' '}
                   {activeClass.academicYear}
@@ -435,16 +435,16 @@ export function ClassesView({
                 <button
                   type="button"
                   onClick={() => handleCopyCode(activeClass.joinCode)}
-                  className="inline-flex items-center gap-1 font-mono font-semibold text-[#1E4D43] hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-1 font-mono font-semibold text-[#0F4C3F] hover:underline cursor-pointer"
                 >
                   {copiedCode === activeClass.joinCode ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-[#16A34A]" />
+                      <Check className="w-3.5 h-3.5 text-[#0F6D4F]" />
                       <span>Đã chép mã {activeClass.joinCode}</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="w-3.5 h-3.5 text-[#8A630D]" />
                       <span>Mã lớp: {activeClass.joinCode}</span>
                     </>
                   )}
@@ -456,7 +456,7 @@ export function ClassesView({
                       `${window.location.origin}/?classCode=${encodeURIComponent(activeClass.joinCode)}`
                     )
                   }
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-[#DCD9D0] bg-[#FAF9F6] text-[11px] font-medium text-[#1E4D43] hover:bg-[#E5ECE7] cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-[#EAD8A6] bg-[#FDF8EB] text-[11px] font-semibold text-[#7A580B] hover:bg-[#F9EED2] cursor-pointer"
                   title="Chép đường dẫn để học sinh bấm vào, chọn tên mình và làm bài"
                 >
                   <Link2 className="w-3 h-3" />
@@ -471,13 +471,13 @@ export function ClassesView({
 
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="relative">
-                <Search className="w-4 h-4 text-[#7C8581] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-[#698078] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Tìm tên, mã HS, SĐT..."
-                  className="pl-9 pr-3.5 py-2 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm text-[#16231F] focus:outline-none focus:border-[#1E4D43] w-56"
+                  className="pl-9 pr-3.5 py-2 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm text-[#0D221D] focus:outline-none focus:border-[#0F4C3F] w-56"
                 />
               </div>
               <button
@@ -486,16 +486,16 @@ export function ClassesView({
                   setImportError(null);
                   setShowImportModal(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors whitespace-nowrap cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-medium hover:bg-[#0A362C] transition-colors whitespace-nowrap cursor-pointer"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-4 h-4 text-[#E5C665]" />
                 <span>Thêm / Nhập danh sách</span>
               </button>
             </div>
           </div>
 
           {filteredStudents.length === 0 ? (
-            <div className="py-10 text-center text-sm text-[#66706C]">
+            <div className="py-10 text-center text-sm text-[#597169]">
               {students.length === 0
                 ? 'Lớp chưa có học sinh nào. Nhấn "Thêm / Nhập danh sách" để nhập nhanh.'
                 : 'Không tìm thấy học sinh khớp từ khoá.'}
@@ -504,7 +504,7 @@ export function ClassesView({
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#ECEAE4] text-xs font-medium text-[#66706C] uppercase tracking-wider">
+                  <tr className="border-b border-[#EBF1EE] text-xs font-semibold text-[#597169] uppercase tracking-wider">
                     <th className="py-3 pr-4">STT</th>
                     <th className="py-3 pr-4">Họ và tên</th>
                     <th className="py-3 pr-4">Mã HS</th>
@@ -513,24 +513,24 @@ export function ClassesView({
                     <th className="py-3 text-right">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#F0EEE8] text-sm">
+                <tbody className="divide-y divide-[#EDF3F0] text-sm">
                   {filteredStudents.map((stu, idx) => (
-                    <tr key={stu.id} className="hover:bg-[#FAF9F6] transition-colors">
-                      <td className="py-3 pr-4 text-[#66706C] tabular-nums">{idx + 1}</td>
-                      <td className="py-3 pr-4 font-medium text-[#16231F]">
+                    <tr key={stu.id} className="hover:bg-[#F8FAF9] transition-colors">
+                      <td className="py-3 pr-4 text-[#597169] tabular-nums">{idx + 1}</td>
+                      <td className="py-3 pr-4 font-medium text-[#0D221D]">
                         {stu.fullName}
                       </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-[#5C6561]">
+                      <td className="py-3 pr-4 font-mono text-xs text-[#4A615A]">
                         {stu.studentCode || '—'}
                       </td>
-                      <td className="py-3 pr-4 text-[#434D49]">
+                      <td className="py-3 pr-4 text-[#3A524A]">
                         {stu.parentName || '—'}
                       </td>
                       <td className="py-3 pr-4 font-mono text-xs tabular-nums">
                         {stu.parentPhone ? (
-                          <span className="text-[#16231F]">{stu.parentPhone}</span>
+                          <span className="text-[#0D221D]">{stu.parentPhone}</span>
                         ) : (
-                          <span className="text-[#9AA19D]">chưa có SĐT</span>
+                          <span className="text-[#8DA29B]">chưa có SĐT</span>
                         )}
                       </td>
                       <td className="py-3 text-right">
@@ -546,7 +546,7 @@ export function ClassesView({
                               setEditParentName(stu.parentName);
                             }}
                             title="Sửa thông tin"
-                            className="p-1.5 rounded-lg text-[#5C6561] hover:text-[#1E4D43] hover:bg-[#E5ECE7] transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-[#4A615A] hover:text-[#0F4C3F] hover:bg-[#EFF7F3] transition-colors cursor-pointer"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
@@ -554,7 +554,7 @@ export function ClassesView({
                             type="button"
                             onClick={() => handleDeleteStudent(stu)}
                             title="Xoá học sinh"
-                            className="p-1.5 rounded-lg text-[#5C6561] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-[#4A615A] hover:text-[#B91C1C] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -571,16 +571,16 @@ export function ClassesView({
 
       {/* Modal: Create Class */}
       {showCreateClass && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-[#E7E5DF] max-w-md w-full p-6 space-y-5">
+        <div className="fixed inset-0 z-50 bg-[#082B23]/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-[#DAE5E0] max-w-md w-full p-6 space-y-5 shadow-xl">
             <div className="flex items-center justify-between">
-              <h3 className="font-serif text-xl font-semibold text-[#16231F]">
+              <h3 className="font-serif text-xl font-semibold text-[#0D221D]">
                 Tạo lớp học mới
               </h3>
               <button
                 type="button"
                 onClick={() => setShowCreateClass(false)}
-                className="p-1.5 rounded-lg text-[#66706C] hover:bg-[#F5F4F0] cursor-pointer"
+                className="p-1.5 rounded-lg text-[#597169] hover:bg-[#EFF7F3] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -588,7 +588,7 @@ export function ClassesView({
 
             <form onSubmit={handleCreateClass} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[#434D49] mb-1.5">
+                <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                   Tên lớp *
                 </label>
                 <input
@@ -597,31 +597,31 @@ export function ClassesView({
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
                   placeholder="Ví dụ: 12A3"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-[#434D49] mb-1.5">
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                     Môn học
                   </label>
                   <input
                     type="text"
                     value={classSubject}
                     onChange={(e) => setClassSubject(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#434D49] mb-1.5">
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1.5">
                     Khối
                   </label>
                   <input
                     type="text"
                     value={classGrade}
                     onChange={(e) => setClassGrade(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
               </div>
@@ -636,14 +636,14 @@ export function ClassesView({
                 <button
                   type="button"
                   onClick={() => setShowCreateClass(false)}
-                  className="px-4 py-2 rounded-xl border border-[#DCD9D0] text-sm font-medium text-[#434D49] hover:bg-[#F5F4F0] cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#F8FAF9] cursor-pointer"
                 >
                   Huỷ
                 </button>
                 <button
                   type="submit"
                   disabled={creatingClass}
-                  className="px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-medium hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer"
                 >
                   {creatingClass ? 'Đang tạo...' : 'Tạo lớp'}
                 </button>
@@ -655,24 +655,24 @@ export function ClassesView({
 
       {/* Modal: Import / Add Students */}
       {showImportModal && activeClass && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-[#E7E5DF] max-w-lg w-full p-6 space-y-5">
+        <div className="fixed inset-0 z-50 bg-[#082B23]/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-[#DAE5E0] max-w-lg w-full p-6 space-y-5 shadow-xl">
             <div className="flex items-center justify-between">
-              <h3 className="font-serif text-xl font-semibold text-[#16231F]">
+              <h3 className="font-serif text-xl font-semibold text-[#0D221D]">
                 Thêm học sinh vào lớp {activeClass.name}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowImportModal(false)}
-                className="p-1.5 rounded-lg text-[#66706C] hover:bg-[#F5F4F0] cursor-pointer"
+                className="p-1.5 rounded-lg text-[#597169] hover:bg-[#EFF7F3] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleAddSingleOrBulk} className="space-y-4">
-              <div className="p-4 rounded-xl bg-[#FAF9F6] border border-[#E7E5DF] space-y-3">
-                <div className="text-xs font-semibold text-[#16231F]">
+              <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#DAE5E0] space-y-3">
+                <div className="text-xs font-semibold text-[#0D221D]">
                   Thêm nhanh 1 học sinh
                 </div>
                 <input
@@ -680,7 +680,7 @@ export function ClassesView({
                   value={singleName}
                   onChange={(e) => setSingleName(e.target.value)}
                   placeholder="Họ và tên (ví dụ: Nguyễn Văn An)"
-                  className="w-full px-3 py-2 rounded-lg border border-[#DCD9D0] bg-white text-sm focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3 py-2 rounded-lg border border-[#CEDCD6] bg-white text-sm focus:outline-none focus:border-[#0F4C3F]"
                 />
                 <div className="grid grid-cols-2 gap-2.5">
                   <input
@@ -688,20 +688,20 @@ export function ClassesView({
                     value={singlePhone}
                     onChange={(e) => setSinglePhone(e.target.value)}
                     placeholder="SĐT phụ huynh"
-                    className="w-full px-3 py-2 rounded-lg border border-[#DCD9D0] bg-white text-sm focus:outline-none focus:border-[#1E4D43]"
+                    className="w-full px-3 py-2 rounded-lg border border-[#CEDCD6] bg-white text-sm focus:outline-none focus:border-[#0F4C3F]"
                   />
                   <input
                     type="text"
                     value={singleCode}
                     onChange={(e) => setSingleCode(e.target.value)}
                     placeholder="Mã HS (tuỳ chọn)"
-                    className="w-full px-3 py-2 rounded-lg border border-[#DCD9D0] bg-white text-sm focus:outline-none focus:border-[#1E4D43]"
+                    className="w-full px-3 py-2 rounded-lg border border-[#CEDCD6] bg-white text-sm focus:outline-none focus:border-[#0F4C3F]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#16231F] mb-1.5">
+                <label className="block text-xs font-semibold text-[#0D221D] mb-1.5">
                   Hoặc dán danh sách nhiều học sinh (mỗi dòng 1 em: Họ tên, SĐT, Mã HS)
                 </label>
                 <textarea
@@ -709,7 +709,7 @@ export function ClassesView({
                   value={bulkText}
                   onChange={(e) => setBulkText(e.target.value)}
                   placeholder={'Trần Minh Khang, 0901234567, HS1210\nLê Ngọc Hân, 0912345678, HS1211'}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] text-sm font-mono focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] text-sm font-mono focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
 
@@ -723,14 +723,14 @@ export function ClassesView({
                 <button
                   type="button"
                   onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 rounded-xl border border-[#DCD9D0] text-sm font-medium text-[#434D49] hover:bg-[#F5F4F0] cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#F8FAF9] cursor-pointer"
                 >
                   Huỷ
                 </button>
                 <button
                   type="submit"
                   disabled={savingStudents}
-                  className="px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-medium hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer"
                 >
                   {savingStudents ? 'Đang lưu...' : 'Lưu vào lớp'}
                 </button>
@@ -742,16 +742,16 @@ export function ClassesView({
 
       {/* Modal: Edit Student */}
       {editingStudent && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-[#E7E5DF] max-w-md w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-[#082B23]/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-[#DAE5E0] max-w-md w-full p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
-              <h3 className="font-serif text-xl font-semibold text-[#16231F]">
+              <h3 className="font-serif text-xl font-semibold text-[#0D221D]">
                 Cập nhật thông tin học sinh
               </h3>
               <button
                 type="button"
                 onClick={() => setEditingStudent(null)}
-                className="p-1.5 rounded-lg text-[#66706C] hover:bg-[#F5F4F0] cursor-pointer"
+                className="p-1.5 rounded-lg text-[#597169] hover:bg-[#EFF7F3] cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -759,7 +759,7 @@ export function ClassesView({
 
             <form onSubmit={handleSaveEdit} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-[#434D49] mb-1">
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
                   Họ và tên
                 </label>
                 <input
@@ -767,33 +767,33 @@ export function ClassesView({
                   required
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#434D49] mb-1">
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
                   Mã học sinh
                 </label>
                 <input
                   type="text"
                   value={editCode}
                   onChange={(e) => setEditCode(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#434D49] mb-1">
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
                   Tên phụ huynh
                 </label>
                 <input
                   type="text"
                   value={editParentName}
                   onChange={(e) => setEditParentName(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#434D49] mb-1">
+                <label className="block text-xs font-medium text-[#3A524A] mb-1">
                   SĐT phụ huynh
                 </label>
                 <input
@@ -801,7 +801,7 @@ export function ClassesView({
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
                   placeholder="09xxxxxxxx"
-                  className="w-full px-3.5 py-2 rounded-xl border border-[#DCD9D0] text-sm focus:outline-none focus:border-[#1E4D43]"
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#CEDCD6] text-sm focus:outline-none focus:border-[#0F4C3F]"
                 />
               </div>
 
@@ -815,14 +815,14 @@ export function ClassesView({
                 <button
                   type="button"
                   onClick={() => setEditingStudent(null)}
-                  className="px-4 py-2 rounded-xl border border-[#DCD9D0] text-sm font-medium text-[#434D49] hover:bg-[#F5F4F0] cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-[#CEDCD6] text-sm font-medium text-[#3A524A] hover:bg-[#F8FAF9] cursor-pointer"
                 >
                   Huỷ
                 </button>
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="px-4 py-2 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] disabled:opacity-60 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#0F4C3F] text-white text-sm font-medium hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer"
                 >
                   {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>

@@ -1390,6 +1390,76 @@ export async function updateSubmissionGrading(
   }
 }
 
+export async function deleteSubmission(
+  submissionId: string,
+  teacherId?: string
+): Promise<void> {
+  const path = `submissions/${submissionId}`;
+  try {
+    if (teacherId) {
+      try {
+        const msgSnap = await getDocs(
+          query(
+            collection(db, 'parentMessages'),
+            where('teacherId', '==', teacherId),
+            where('submissionId', '==', submissionId)
+          )
+        );
+        if (!msgSnap.empty) {
+          const msgBatch = writeBatch(db);
+          msgSnap.docs.forEach((d) => msgBatch.delete(d.ref));
+          await msgBatch.commit();
+        }
+      } catch (msgErr) {
+        console.warn('Could not clean up parentMessages for deleted submission:', msgErr);
+      }
+    }
+    await deleteDoc(doc(db, 'submissions', submissionId));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+}
+
+export async function deleteSubmissionsBulk(
+  submissionIds: string[],
+  teacherId?: string
+): Promise<number> {
+  const uniqueIds = Array.from(new Set(submissionIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return 0;
+
+  try {
+    if (teacherId) {
+      try {
+        const msgSnap = await getDocs(
+          query(collection(db, 'parentMessages'), where('teacherId', '==', teacherId))
+        );
+        const targetSet = new Set(uniqueIds);
+        const linkedMsgs = msgSnap.docs.filter((d) =>
+          targetSet.has(String((d.data() as ParentMessage).submissionId || ''))
+        );
+        for (let i = 0; i < linkedMsgs.length; i += 400) {
+          const batch = writeBatch(db);
+          linkedMsgs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      } catch (msgErr) {
+        console.warn('Could not clean up parentMessages in bulk delete:', msgErr);
+      }
+    }
+
+    for (let i = 0; i < uniqueIds.length; i += 400) {
+      const batch = writeBatch(db);
+      uniqueIds.slice(i, i + 400).forEach((id) => {
+        batch.delete(doc(db, 'submissions', id));
+      });
+      await batch.commit();
+    }
+    return uniqueIds.length;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, 'submissions/bulk');
+  }
+}
+
 export async function saveParentMessage(input: {
   teacherId: string;
   submissionId: string;

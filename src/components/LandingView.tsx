@@ -85,20 +85,20 @@ export function LandingView({
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#16231F] flex flex-col">
-      {/* Minimal Header: Brand only */}
-      <header className="border-b border-[#E7E5DF] bg-[#FAF9F6]/90 backdrop-blur-sm">
+    <div className="min-h-screen bg-[#F6F8F7] text-[#0D221D] flex flex-col">
+      {/* Header: Deep Imperial Jade + Champagne Gold trim */}
+      <header className="border-b border-[#C89B2B]/30 bg-[#0A362C] text-white">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between gap-6">
           <div className="flex items-center gap-2.5 whitespace-nowrap shrink-0">
-            <span className="w-8 h-8 rounded-full bg-[#1E4D43] text-white font-serif font-bold text-sm flex items-center justify-center">
+            <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#E5C665] via-[#C89B2B] to-[#9E7514] text-[#082B23] font-serif font-bold text-sm flex items-center justify-center ring-1 ring-[#F4DE96]/50">
               10
             </span>
-            <span className="font-serif font-bold text-lg text-[#16231F]">
+            <span className="font-serif font-bold text-lg text-white">
               Điểm 10
             </span>
           </div>
 
-          <div className="text-xs font-medium text-[#5C6561]">
+          <div className="text-xs font-medium text-[#E5C665] tracking-wide">
             Cổng đăng nhập Giáo viên &amp; Học sinh
           </div>
         </div>
@@ -108,14 +108,14 @@ export function LandingView({
       <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-10 sm:py-14">
         <div className="max-w-4xl w-full space-y-8">
           <div className="text-center space-y-2 max-w-xl mx-auto">
-            <div className="text-xs font-medium tracking-[0.08em] text-[#1E4D43] uppercase">
-              Đăng nhập hệ thống
+            <div className="text-xs font-semibold tracking-[0.12em] text-[#8A630D] uppercase">
+              Hệ thống khảo thí &amp; chấm bài thông minh
             </div>
-            <h1 className="font-serif text-3xl sm:text-4xl font-semibold text-[#16231F]">
+            <h1 className="font-serif text-3xl sm:text-4xl font-semibold text-[#0D221D]">
               Chọn vai trò để tiếp tục
             </h1>
-            <p className="text-sm text-[#5C6561]">
-              Giao diện đăng nhập dành riêng cho Giáo viên quản lý lớp học và Học sinh làm bài kiểm tra.
+            <p className="text-sm text-[#4A615A]">
+              Giao diện dành riêng cho Giáo viên quản lý lớp học, phân tích dữ liệu và Học sinh vào lớp làm bài kiểm tra.
             </p>
           </div>
 
@@ -127,29 +127,29 @@ export function LandingView({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
             {/* TEACHER LOGIN CARD */}
-            <section className="bg-white border border-[#DCD9D0] rounded-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6">
+            <section className="bg-white border border-[#DAE5E0] rounded-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6 shadow-[0_6px_24px_-12px_rgba(10,54,44,0.12)]">
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-[#E5ECE7] text-[#1E4D43] flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 pb-4 border-b border-[#EBF1EE]">
+                  <div className="w-11 h-11 rounded-xl bg-[#0A362C] text-[#E5C665] flex items-center justify-center shrink-0 ring-1 ring-[#C89B2B]/40">
                     <BookOpenCheck className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="font-serif text-2xl font-semibold text-[#16231F]">
+                    <h2 className="font-serif text-2xl font-semibold text-[#0D221D]">
                       Giáo viên
                     </h2>
-                    <p className="text-xs text-[#66706C]">
+                    <p className="text-xs text-[#597169]">
                       Quản lý lớp học, đề thi &amp; chấm bài AI
                     </p>
                   </div>
                 </div>
 
                 {user && userRole === 'teacher' ? (
-                  <div className="p-4 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1E7E48]">
-                      <UserCheck className="w-3.5 h-3.5" />
+                  <div className="p-4 rounded-xl bg-[#EFF7F3] border border-[#C5DDD3] space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#0F4C3F]">
+                      <UserCheck className="w-3.5 h-3.5 text-[#8A630D]" />
                       <span>Đang đăng nhập tài khoản Giáo viên</span>
                     </div>
-                    <div className="text-sm font-medium text-[#16231F] truncate">
+                    <div className="text-sm font-medium text-[#0D221D] truncate">
                       {user.email || user.displayName}
                     </div>
                   </div>
@@ -158,24 +158,24 @@ export function LandingView({
                     <div>
                       <label
                         htmlFor="teacher-email-input"
-                        className="block text-xs font-medium text-[#434D49] mb-1.5"
+                        className="block text-xs font-medium text-[#3A524A] mb-1.5"
                       >
                         Email Google Giáo viên (tuỳ chọn gợi ý)
                       </label>
                       <div className="relative">
-                        <Mail className="w-4 h-4 text-[#7C8581] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <Mail className="w-4 h-4 text-[#698078] absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
                           id="teacher-email-input"
                           type="email"
                           value={teacherEmailInput}
                           onChange={(e) => setTeacherEmailInput(e.target.value)}
                           placeholder="giaovien@gmail.com"
-                          className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm text-[#16231F] focus:outline-none focus:ring-2 focus:ring-[#1E4D43]/20 focus:border-[#1E4D43]"
+                          className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm text-[#0D221D] focus:outline-none focus:ring-2 focus:ring-[#0F4C3F]/20 focus:border-[#0F4C3F]"
                         />
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-[#FAF9F6] border border-[#ECEAE4] text-xs text-[#5C6561] leading-relaxed">
+                    <div className="p-3 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-xs text-[#694E10] leading-relaxed">
                       Khi đăng nhập bằng email giáo viên, hệ thống tự động nạp sẵn dữ liệu lớp học (12A1, 12A2, 12A5), danh sách học sinh và đề kiểm tra mẫu.
                     </div>
                   </form>
@@ -188,24 +188,24 @@ export function LandingView({
                     <button
                       type="button"
                       onClick={onEnterTeacherDashboard}
-                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors cursor-pointer"
+                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#0F4C3F] border border-[#C89B2B]/40 text-white text-sm font-medium hover:bg-[#0A362C] transition-colors cursor-pointer"
                     >
                       <span>Vào lớp học &amp; bảng điều khiển</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <ArrowRight className="w-4 h-4 text-[#E5C665]" />
                     </button>
                     <div className="flex items-center justify-between gap-2 pt-1">
                       <button
                         type="button"
                         disabled={authLoading}
                         onClick={() => onTeacherSignIn(teacherEmailInput.trim() || undefined)}
-                        className="text-xs font-medium text-[#1E4D43] hover:underline cursor-pointer"
+                        className="text-xs font-medium text-[#0F4C3F] hover:underline cursor-pointer"
                       >
                         Đổi email giáo viên khác
                       </button>
                       <button
                         type="button"
                         onClick={onSignOut}
-                        className="inline-flex items-center gap-1 text-xs text-[#66706C] hover:text-[#16231F] cursor-pointer"
+                        className="inline-flex items-center gap-1 text-xs text-[#597169] hover:text-[#0D221D] cursor-pointer"
                       >
                         <LogOut className="w-3.5 h-3.5" />
                         <span>Đăng xuất</span>
@@ -217,41 +217,41 @@ export function LandingView({
                     type="submit"
                     form="teacher-login-form"
                     disabled={authLoading}
-                    className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#1E4D43] text-white text-sm font-medium hover:bg-[#163B33] transition-colors disabled:opacity-60 cursor-pointer"
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#0F4C3F] border border-[#C89B2B]/40 text-white text-sm font-medium hover:bg-[#0A362C] transition-colors disabled:opacity-60 cursor-pointer"
                   >
                     <span>
                       {authLoading ? 'Đang đăng nhập...' : 'Đăng nhập bằng mail Giáo viên'}
                     </span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 text-[#E5C665]" />
                   </button>
                 )}
               </div>
             </section>
 
             {/* STUDENT LOGIN CARD */}
-            <section className="bg-white border border-[#E7E5DF] rounded-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6">
+            <section className="bg-white border border-[#EAD8A6] rounded-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6 shadow-[0_6px_24px_-12px_rgba(166,124,27,0.14)]">
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-[#F5F4F0] text-[#16231F] flex items-center justify-center shrink-0">
-                    <GraduationCap className="w-5 h-5 text-[#1E4D43]" />
+                <div className="flex items-center gap-3 pb-4 border-b border-[#F4ECD4]">
+                  <div className="w-11 h-11 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] flex items-center justify-center shrink-0">
+                    <GraduationCap className="w-5 h-5 text-[#0F4C3F]" />
                   </div>
                   <div>
-                    <h2 className="font-serif text-2xl font-semibold text-[#16231F]">
+                    <h2 className="font-serif text-2xl font-semibold text-[#0D221D]">
                       Học sinh
                     </h2>
-                    <p className="text-xs text-[#66706C]">
+                    <p className="text-xs text-[#597169]">
                       Vào phòng thi toàn màn hình &amp; nộp bài
                     </p>
                   </div>
                 </div>
 
                 {user && userRole === 'student' && (
-                  <div className="p-3.5 rounded-xl bg-[#F4FAF6] border border-[#D4ECDC] space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#1E7E48]">
-                      <UserCheck className="w-3.5 h-3.5" />
+                  <div className="p-3.5 rounded-xl bg-[#EFF7F3] border border-[#C5DDD3] space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#0F4C3F]">
+                      <UserCheck className="w-3.5 h-3.5 text-[#8A630D]" />
                       <span>Đang đăng nhập tài khoản Học sinh</span>
                     </div>
-                    <div className="text-sm font-medium text-[#16231F] truncate">
+                    <div className="text-sm font-medium text-[#0D221D] truncate">
                       {user.email || user.displayName}
                     </div>
                   </div>
@@ -261,12 +261,12 @@ export function LandingView({
                   <div>
                     <label
                       htmlFor="class-code-entry"
-                      className="block text-xs font-semibold text-[#16231F] mb-1.5"
+                      className="block text-xs font-semibold text-[#0D221D] mb-1.5"
                     >
                       Mã lớp học (để vào lớp &amp; chọn tên bạn)
                     </label>
                     <div className="relative">
-                      <Users className="w-4 h-4 text-[#7C8581] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <Users className="w-4 h-4 text-[#698078] absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         id="class-code-entry"
                         type="text"
@@ -276,7 +276,7 @@ export function LandingView({
                           if (guestCodeError) setGuestCodeError(null);
                         }}
                         placeholder="Ví dụ: 12A1_XXXX hoặc LY12A1"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm font-mono uppercase text-[#16231F] focus:outline-none focus:ring-2 focus:ring-[#1E4D43]/20 focus:border-[#1E4D43]"
+                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm font-mono uppercase text-[#0D221D] focus:outline-none focus:ring-2 focus:ring-[#0F4C3F]/20 focus:border-[#0F4C3F]"
                       />
                     </div>
                   </div>
@@ -285,7 +285,7 @@ export function LandingView({
                     <div>
                       <label
                         htmlFor="exam-code-entry"
-                        className="block text-xs font-medium text-[#434D49] mb-1.5"
+                        className="block text-xs font-medium text-[#3A524A] mb-1.5"
                       >
                         Mã đề kiểm tra (tuỳ chọn)
                       </label>
@@ -295,7 +295,7 @@ export function LandingView({
                         value={examCodeInput}
                         onChange={(e) => setExamCodeInput(e.target.value)}
                         placeholder="Ví dụ: VL12HK1"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm font-mono text-[#16231F] focus:outline-none focus:ring-2 focus:ring-[#1E4D43]/20 focus:border-[#1E4D43]"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm font-mono text-[#0D221D] focus:outline-none focus:ring-2 focus:ring-[#0F4C3F]/20 focus:border-[#0F4C3F]"
                       />
                     </div>
 
@@ -303,12 +303,12 @@ export function LandingView({
                       <div>
                         <label
                           htmlFor="student-code-entry"
-                          className="block text-xs font-medium text-[#434D49] mb-1.5"
+                          className="block text-xs font-medium text-[#3A524A] mb-1.5"
                         >
                           Hoặc Mã học sinh
                         </label>
                         <div className="relative">
-                          <KeyRound className="w-4 h-4 text-[#7C8581] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                          <KeyRound className="w-4 h-4 text-[#698078] absolute left-3.5 top-1/2 -translate-y-1/2" />
                           <input
                             id="student-code-entry"
                             type="text"
@@ -318,7 +318,7 @@ export function LandingView({
                               if (guestCodeError) setGuestCodeError(null);
                             }}
                             placeholder="VD: HS1201"
-                            className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-sm font-mono uppercase text-[#16231F] focus:outline-none focus:ring-2 focus:ring-[#1E4D43]/20 focus:border-[#1E4D43]"
+                            className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-sm font-mono uppercase text-[#0D221D] focus:outline-none focus:ring-2 focus:ring-[#0F4C3F]/20 focus:border-[#0F4C3F]"
                           />
                         </div>
                       </div>
@@ -329,7 +329,7 @@ export function LandingView({
                     <p className="text-xs text-[#B91C1C]">{guestCodeError}</p>
                   )}
 
-                  <p className="text-xs text-[#5C6561] leading-relaxed">
+                  <p className="text-xs text-[#4A615A] leading-relaxed">
                     Nhập <strong>Mã lớp</strong> do thầy cô cung cấp để vào danh sách lớp, chọn đúng tên của mình và làm bài (không cần mật khẩu), hoặc đăng nhập bằng Google.
                   </p>
                 </form>
@@ -341,7 +341,7 @@ export function LandingView({
                     <button
                       type="submit"
                       form="student-login-form"
-                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#2B6B5E] text-white text-sm font-medium hover:bg-[#1E4D43] transition-colors cursor-pointer"
+                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-[#C89B2B] to-[#B0831A] text-white text-sm font-semibold hover:from-[#B58A21] hover:to-[#9B7214] transition-all cursor-pointer"
                     >
                       <span>Vào lớp &amp; phòng thi Học sinh</span>
                       <ArrowRight className="w-4 h-4" />
@@ -351,14 +351,14 @@ export function LandingView({
                         type="button"
                         disabled={authLoading}
                         onClick={() => onStudentSignIn(examCodeInput.trim() || undefined)}
-                        className="text-xs font-medium text-[#1E4D43] hover:underline cursor-pointer"
+                        className="text-xs font-medium text-[#0F4C3F] hover:underline cursor-pointer"
                       >
                         Đổi tài khoản học sinh
                       </button>
                       <button
                         type="button"
                         onClick={onSignOut}
-                        className="inline-flex items-center gap-1 text-xs text-[#66706C] hover:text-[#16231F] cursor-pointer"
+                        className="inline-flex items-center gap-1 text-xs text-[#597169] hover:text-[#0D221D] cursor-pointer"
                       >
                         <LogOut className="w-3.5 h-3.5" />
                         <span>Đăng xuất</span>
@@ -370,7 +370,7 @@ export function LandingView({
                     <button
                       type="button"
                       onClick={handleGuestExamEntry}
-                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#2B6B5E] text-white text-sm font-medium hover:bg-[#1E4D43] transition-colors cursor-pointer"
+                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-[#C89B2B] to-[#B0831A] text-white text-sm font-semibold hover:from-[#B58A21] hover:to-[#9B7214] transition-all cursor-pointer"
                     >
                       <span>
                         {user && userRole === 'teacher'
@@ -384,7 +384,7 @@ export function LandingView({
                       type="submit"
                       form="student-login-form"
                       disabled={authLoading}
-                      className="w-full py-2.5 px-4 rounded-xl border border-[#DCD9D0] bg-[#FAF9F6] text-[#434D49] text-xs font-medium hover:bg-[#F0EEE8] transition-colors disabled:opacity-60 cursor-pointer"
+                      className="w-full py-2.5 px-4 rounded-xl border border-[#CEDCD6] bg-[#F8FAF9] text-[#3A524A] text-xs font-medium hover:bg-[#EAF3EF] transition-colors disabled:opacity-60 cursor-pointer"
                     >
                       {authLoading ? 'Đang đăng nhập...' : 'Đăng nhập Học sinh bằng Google'}
                     </button>
