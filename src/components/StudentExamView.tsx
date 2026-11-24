@@ -29,6 +29,11 @@ import {
   normalizeStudentCode,
   submitStudentExam,
 } from '../services/firestoreService';
+import {
+  generateRemedialPracticeWithAi,
+  generateStudentReviewWithAi,
+  gradeEssayWithAi,
+} from '../services/geminiService';
 import type {
   ClassRoster,
   ClassRosterEntry,
@@ -689,40 +694,15 @@ export function StudentExamView({
         };
       });
 
-      const resp = await fetch('/api/ai/student-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentName: studentName.trim() || 'em',
-          subject: exam.subject,
-          examTitle: exam.title,
-          totalScore,
-          maxScore,
-          durationSeconds,
-          questionResults,
-        }),
+      const data = await generateStudentReviewWithAi({
+        studentName: studentName.trim() || 'em',
+        subject: exam.subject,
+        examTitle: exam.title,
+        totalScore,
+        maxScore,
+        durationSeconds,
+        questionResults,
       });
-      const rawText = await resp.text();
-      let data: Record<string, unknown> = {};
-      try {
-        data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {};
-      } catch {
-        data = {};
-      }
-      if (!resp.ok) {
-        const apiMsg = typeof data.error === 'string' ? data.error : '';
-        if (apiMsg) {
-          throw new Error(apiMsg);
-        }
-        if (resp.status === 502 || resp.status === 504) {
-          throw new Error(
-            `Máy chủ AI phản hồi quá lâu (HTTP ${resp.status}). Vui lòng bấm Tải lại nhận xét.`
-          );
-        }
-        throw new Error(
-          `Không thể tải phân tích nhận xét bài làm (HTTP ${resp.status}).`
-        );
-      }
       setStudentReview({
         overallComment: String(data.overallComment || ''),
         strengths: String(data.strengths || ''),
@@ -810,28 +790,11 @@ export function StudentExamView({
     setPracticeLoading(true);
     setPracticeError(null);
     try {
-      const resp = await fetch('/api/ai/generate-remedial-practice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subject: exam.subject,
-          examTitle: exam.title,
-          wrongQuestions,
-        }),
+      const data = await generateRemedialPracticeWithAi({
+        subject: exam.subject,
+        examTitle: exam.title,
+        wrongQuestions,
       });
-      const rawText = await resp.text();
-      let data: Record<string, unknown> = {};
-      try {
-        data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {};
-      } catch {
-        data = {};
-      }
-      if (!resp.ok) {
-        const apiMsg = typeof data.error === 'string' ? data.error : '';
-        throw new Error(
-          apiMsg || `Không thể tạo bài ôn tập AI (HTTP ${resp.status}).`
-        );
-      }
       setPracticeData({
         focusSummary: String(data.focusSummary || ''),
         practiceQuestions: Array.isArray(data.practiceQuestions)
@@ -966,62 +929,42 @@ export function StudentExamView({
             };
           });
 
-          const aiRes = await fetch('/api/ai/grade-essay', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              studentName: studentName.trim() || 'Học sinh',
-              examTitle: selectedExam.title,
-              items: itemsPayload,
-            }),
+          const aiData = await gradeEssayWithAi({
+            studentName: studentName.trim() || 'Học sinh',
+            examTitle: selectedExam.title,
+            items: itemsPayload,
           });
-          if (aiRes.ok) {
-            const aiData = await aiRes.json();
-            const resultMap = new Map<
-              string,
-              {
-                proposedScore: number;
-                recognizedText: string;
-                feedback: string;
-                breakdown: { criterion: string; score: number; maxScore: number; met: boolean }[];
-              }
-            >();
-            if (Array.isArray(aiData.results)) {
-              aiData.results.forEach(
-                (r: {
-                  questionId: string;
-                  proposedScore: number;
-                  recognizedText: string;
-                  feedback: string;
-                  breakdown: {
-                    criterion: string;
-                    score: number;
-                    maxScore: number;
-                    met: boolean;
-                  }[];
-                }) => {
-                  resultMap.set(r.questionId, r);
-                }
-              );
+          const resultMap = new Map<
+            string,
+            {
+              proposedScore: number;
+              recognizedText: string;
+              feedback: string;
+              breakdown: { criterion: string; score: number; maxScore: number; met: boolean }[];
             }
-
-            gradedAnswers = gradedAnswers.map((ans) => {
-              const hit = resultMap.get(ans.questionId);
-              if (!hit) return ans;
-              const clamped = Math.min(
-                Math.max(Number(hit.proposedScore || 0), 0),
-                ans.maxScore
-              );
-              return {
-                ...ans,
-                score: Number(clamped.toFixed(2)),
-                isCorrect: clamped >= ans.maxScore,
-                recognizedText: hit.recognizedText || '',
-                aiFeedback: hit.feedback || '',
-                aiBreakdown: Array.isArray(hit.breakdown) ? hit.breakdown : [],
-              };
+          >();
+          if (Array.isArray(aiData.results)) {
+            aiData.results.forEach((r) => {
+              resultMap.set(r.questionId, r);
             });
           }
+
+          gradedAnswers = gradedAnswers.map((ans) => {
+            const hit = resultMap.get(ans.questionId);
+            if (!hit) return ans;
+            const clamped = Math.min(
+              Math.max(Number(hit.proposedScore || 0), 0),
+              ans.maxScore
+            );
+            return {
+              ...ans,
+              score: Number(clamped.toFixed(2)),
+              isCorrect: clamped >= ans.maxScore,
+              recognizedText: hit.recognizedText || '',
+              aiFeedback: hit.feedback || '',
+              aiBreakdown: Array.isArray(hit.breakdown) ? hit.breakdown : [],
+            };
+          });
         } catch {
           // If AI grading fails or times out, fall back safely so submission persists as pending_essay
         }

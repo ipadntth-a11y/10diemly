@@ -21,6 +21,10 @@ import {
   saveParentMessage,
   updateSubmissionGrading,
 } from '../services/firestoreService';
+import {
+  analyzeStudentWithAi,
+  gradeEssayWithAi,
+} from '../services/geminiService';
 import type { EssayCriterionResult, Exam, StudentAnswer, Submission } from '../types';
 import {
   buildDefaultParentMessage,
@@ -288,21 +292,15 @@ export function SubmissionDetailView({
           suspectedFastGuess: a.timeSpentSeconds > 0 && a.timeSpentSeconds < 5,
         };
       });
-      const res = await fetch('/api/ai/analyze-student', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentName: submission.studentName,
-          examTitle: submission.examTitle,
-          totalScore: computedTotal,
-          maxScore: submission.maxScore,
-          durationSeconds: submission.durationSeconds,
-          violationCount: submission.violationCount,
-          questionSummaries: summaries,
-        }),
+      const data = await analyzeStudentWithAi({
+        studentName: submission.studentName,
+        examTitle: submission.examTitle,
+        totalScore: computedTotal,
+        maxScore: submission.maxScore,
+        durationSeconds: submission.durationSeconds,
+        violationCount: submission.violationCount,
+        questionSummaries: summaries,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Không thể phân tích học lực.');
       setAiAnalysis(data.analysis || '');
       if (!teacherComment.trim() && data.suggestedComment) {
         setTeacherComment(data.suggestedComment);
@@ -331,17 +329,11 @@ export function SubmissionDetailView({
       };
     });
 
-    const res = await fetch('/api/ai/grade-essay', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studentName: submission.studentName,
-        examTitle: submission.examTitle,
-        items,
-      }),
+    const data = await gradeEssayWithAi({
+      studentName: submission.studentName,
+      examTitle: submission.examTitle,
+      items,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Không thể chấm tự luận bằng AI.');
 
     const resultMap = new Map<
       string,

@@ -17,6 +17,7 @@ import {
   regradeExamSubmissions,
   updateExam,
 } from '../services/firestoreService';
+import { generateExplanationsWithAi } from '../services/geminiService';
 import type { Classroom, Exam, ExamQuestion, QuestionType, Submission } from '../types';
 import { compressExamPhoto } from '../utils/imageUtils';
 import { containsLatexFormula, MathText } from './MathText';
@@ -182,20 +183,12 @@ export function ExamEditorModal({
     setError(null);
     try {
       const overwriteAll = missingExplanationCount === 0;
-      const res = await fetch('/api/ai/generate-explanations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          subject,
-          overwriteAll,
-          questions,
-        }),
+      const data = await generateExplanationsWithAi({
+        title,
+        subject,
+        overwriteAll,
+        questions,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Không thể dùng AI viết lời giải từ đáp án.');
-      }
       const expMap = new Map<string, string>();
       if (Array.isArray(data.explanations)) {
         for (const item of data.explanations) {

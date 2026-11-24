@@ -31,6 +31,11 @@ import {
   toggleExamPublish,
   updateExam,
 } from '../services/firestoreService';
+import {
+  generateExamWithAi,
+  generateExplanationsWithAi,
+  parseWordExamWithAi,
+} from '../services/geminiService';
 import type { Classroom, Exam, ExamQuestion, QuestionType, Submission } from '../types';
 import {
   getSubmissionScore10,
@@ -195,32 +200,24 @@ export function ExamsView({
     setGeneratingWordExplanations(true);
     setCreateError(null);
     try {
-      const res = await fetch('/api/ai/generate-explanations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: meta?.title ?? (newTitle.trim() || 'Đề kiểm tra từ file Word'),
-          subject: meta?.subject ?? (newSubject.trim() || 'Tổng hợp'),
-          overwriteAll,
-          questions: targetQuestions.map((q) => ({
-            id: q.id,
-            index: q.index,
-            type: q.type,
-            prompt: q.prompt,
-            ...(q.options ? { options: q.options } : {}),
-            ...(typeof q.correctOption === 'number'
-              ? { correctOption: q.correctOption }
-              : {}),
-            ...(q.statements ? { statements: q.statements } : {}),
-            ...(q.correctAnswer ? { correctAnswer: q.correctAnswer } : {}),
-            explanation: q.explanation || '',
-          })),
-        }),
+      const data = await generateExplanationsWithAi({
+        title: meta?.title ?? (newTitle.trim() || 'Đề kiểm tra từ file Word'),
+        subject: meta?.subject ?? (newSubject.trim() || 'Tổng hợp'),
+        overwriteAll,
+        questions: targetQuestions.map((q) => ({
+          id: q.id,
+          index: q.index,
+          type: q.type,
+          prompt: q.prompt,
+          ...(q.options ? { options: q.options } : {}),
+          ...(typeof q.correctOption === 'number'
+            ? { correctOption: q.correctOption }
+            : {}),
+          ...(q.statements ? { statements: q.statements } : {}),
+          ...(q.correctAnswer ? { correctAnswer: q.correctAnswer } : {}),
+          explanation: q.explanation || '',
+        })),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Không thể dùng AI tạo lời giải từ đáp án.');
-      }
       const expMap = new Map<string, string>();
       if (Array.isArray(data.explanations)) {
         for (const item of data.explanations) {
@@ -295,15 +292,9 @@ export function ExamsView({
     setRefiningWordAi(true);
     setCreateError(null);
     try {
-      const res = await fetch('/api/ai/parse-word-exam', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ annotatedText: wordResult.annotatedTextForAi }),
+      const data = await parseWordExamWithAi({
+        annotatedText: wordResult.annotatedTextForAi,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Không thể chuẩn hoá đề Word bằng AI.');
-      }
       const pool = wordResult.imagePool;
       const mapped: ParsedDocxQuestion[] = (data.questions || []).map(
         (
@@ -449,22 +440,14 @@ export function ExamsView({
     setGenerating(true);
     setCreateError(null);
     try {
-      const res = await fetch('/api/ai/generate-exam', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subject: newSubject,
-          topic: aiTopic,
-          mcqCount: aiMcqCount,
-          tfCount: aiTfCount,
-          shortCount: aiShortCount,
-          essayCount: aiEssayCount,
-        }),
+      const data = await generateExamWithAi({
+        subject: newSubject,
+        topic: aiTopic,
+        mcqCount: aiMcqCount,
+        tfCount: aiTfCount,
+        shortCount: aiShortCount,
+        essayCount: aiEssayCount,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Không thể sinh đề từ Gemini API.');
-      }
       const normalized: ExamQuestion[] = (data.questions || []).map(
         (q: Partial<ExamQuestion>, idx: number) => {
           const type: QuestionType =

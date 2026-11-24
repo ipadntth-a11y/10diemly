@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { EssayCriterionResult, Exam } from '../types';
+import { gradePhotoWithAi } from '../services/geminiService';
 import { compressExamPhoto } from '../utils/imageUtils';
 import { MathText } from './MathText';
 
@@ -89,21 +90,13 @@ export function PhotoEssayGraderModal({
     setGrading(true);
     setError(null);
     try {
-      const res = await fetch('/api/ai/grade-photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: aiBase64,
-          imageMimeType: aiMimeType,
-          promptText,
-          rubricText,
-          maxScore,
-        }),
+      const data = await gradePhotoWithAi({
+        imageBase64: aiBase64,
+        imageMimeType: aiMimeType,
+        promptText,
+        rubricText,
+        maxScore,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Không thể chấm ảnh bài làm.');
-      }
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối AI.');
