@@ -1,0 +1,6 @@
+{
+  "name": "Điểm 10 — Nền tảng Kiểm tra & Chấm bài",
+  "description": "Hệ thống quản lý lớp học, soạn đề thi trực tuyến, phân tích thống kê câu hỏi, chấm tự luận bằng AI và nhắn tin phụ huynh dành cho giáo viên và học sinh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
