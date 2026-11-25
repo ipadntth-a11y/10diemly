@@ -7,6 +7,7 @@ import { ExamsView } from './components/ExamsView';
 import { LandingView } from './components/LandingView';
 import { OverviewView } from './components/OverviewView';
 import { ParentMessagesView } from './components/ParentMessagesView';
+import { ReferenceBankView } from './components/ReferenceBankView';
 import { Sidebar } from './components/Sidebar';
 import { StudentExamView } from './components/StudentExamView';
 import { SubmissionDetailView } from './components/SubmissionDetailView';
@@ -17,10 +18,12 @@ import {
   getUserProfile,
   subscribeTeacherWorkspace,
 } from './services/firestoreService';
+import { subscribeTeacherReferenceMaterials } from './services/referenceBankService';
 import type {
   Classroom,
   Exam,
   ParentMessage,
+  ReferenceMaterial,
   Submission,
   TeacherNavTab,
 } from './types';
@@ -106,6 +109,7 @@ function AppShell() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [parentMessages, setParentMessages] = useState<ParentMessage[]>([]);
+  const [referenceMaterials, setReferenceMaterials] = useState<ReferenceMaterial[]>([]);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
 
   const pendingRoleRef = useRef<PortalRole | null>(null);
@@ -157,11 +161,13 @@ function AppShell() {
       setExams([]);
       setSubmissions([]);
       setParentMessages([]);
+      setReferenceMaterials([]);
       return;
     }
 
     let active = true;
     let unsubWorkspace: (() => void) | null = null;
+    let unsubReferences: (() => void) | null = null;
 
     async function initTeacherData() {
       if (!user) return;
@@ -180,6 +186,10 @@ function AppShell() {
           setSubmissions,
           setParentMessages
         );
+        unsubReferences = subscribeTeacherReferenceMaterials(
+          user.uid,
+          setReferenceMaterials
+        );
       } finally {
         if (active) setWorkspaceLoading(false);
       }
@@ -190,6 +200,7 @@ function AppShell() {
     return () => {
       active = false;
       if (unsubWorkspace) unsubWorkspace();
+      if (unsubReferences) unsubReferences();
     };
   }, [authReady, user, sessionRole]);
 
@@ -278,6 +289,7 @@ function AppShell() {
         initialClassCode={studentClassCodeHint}
         teacherExams={isTeacherPreview ? exams : []}
         teacherClasses={isTeacherPreview ? classes : []}
+        teacherReferenceMaterials={isTeacherPreview ? referenceMaterials : undefined}
         isTeacherPreview={isTeacherPreview}
         onExit={() => setRoute(isTeacherPreview ? 'teacher' : 'landing')}
         onSignInRequest={() => handleStudentSignIn(studentExamCode)}
@@ -401,6 +413,7 @@ function AppShell() {
                 classes={classes}
                 exams={exams}
                 submissions={submissions}
+                referenceMaterials={referenceMaterials}
                 selectedExamId={selectedExamId}
                 onSelectExam={(id) => {
                   setSelectedExamId(id);
@@ -410,6 +423,12 @@ function AppShell() {
                 openCreateModalSignal={openExamModalSignal}
               />
             )
+          ) : activeTab === 'reference_bank' ? (
+            <ReferenceBankView
+              teacherId={user.uid}
+              materials={referenceMaterials}
+              exams={exams}
+            />
           ) : (
             <ParentMessagesView
               teacherId={user.uid}

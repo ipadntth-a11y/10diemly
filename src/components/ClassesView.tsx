@@ -28,6 +28,7 @@ import {
   computeClassScoreStats,
   computeStudentPerformanceInClass,
 } from '../utils/classStats';
+import { analyzeSubmissionEffort } from '../utils/effortAnalysis';
 
 interface ClassesViewProps {
   teacherId: string;
@@ -694,7 +695,7 @@ export function ClassesView({
                       </td>
                       <td className="py-3 pr-4 text-xs tabular-nums">
                         {perf.submissionCount > 0 && perf.avgScore10 !== null ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={`px-2 py-0.5 rounded-md font-semibold border ${
                                 perf.avgScore10 >= 6.5
@@ -706,6 +707,29 @@ export function ClassesView({
                             >
                               TB {perf.avgScore10.toFixed(2)}/10
                             </span>
+                            {(() => {
+                              const latestSub = perf.latestSubmissionId
+                                ? examFilteredSubs.find((s) => s.id === perf.latestSubmissionId)
+                                : undefined;
+                              if (!latestSub) return null;
+                              const effort = analyzeSubmissionEffort(
+                                latestSub,
+                                exams.find((e) => e.id === latestSub.examId)
+                              );
+                              if (effort.level === 'serious') return null;
+                              return (
+                                <span
+                                  title={effort.reasons.join(' • ')}
+                                  className={`px-2 py-0.5 rounded-md border font-semibold ${
+                                    effort.level === 'perfunctory'
+                                      ? 'bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C]'
+                                      : 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D]'
+                                  }`}
+                                >
+                                  {effort.level === 'perfunctory' ? 'Đối phó' : 'Lưu ý'}
+                                </span>
+                              );
+                            })()}
                             <span className="text-[#597169]">({perf.submissionCount} bài)</span>
                             {onOpenSubmission && perf.latestSubmissionId && (
                               <button

@@ -28,6 +28,7 @@ import type {
   UserProfile,
 } from '../types';
 import { recompressDataUrlToBudget } from '../utils/imageUtils';
+import { syncStudentJournalsForTeacher } from './studentJournalService';
 
 function makeSafeId(prefix: string): string {
   const rand = Math.random().toString(36).slice(2, 10);
@@ -534,6 +535,22 @@ export function subscribeTeacherWorkspace(
   onSubmissions: (items: Submission[]) => void,
   onMessages: (items: ParentMessage[]) => void
 ): () => void {
+  let latestExams: Exam[] = [];
+  let latestSubs: Submission[] = [];
+  let examsReady = false;
+  let subsReady = false;
+  let journalSyncTimer: number | null = null;
+
+  const scheduleJournalSync = () => {
+    if (!examsReady || !subsReady) return;
+    if (journalSyncTimer !== null) {
+      window.clearTimeout(journalSyncTimer);
+    }
+    journalSyncTimer = window.setTimeout(() => {
+      void syncStudentJournalsForTeacher(teacherId, latestSubs, latestExams);
+    }, 600);
+  };
+
   const unsubClasses = onSnapshot(
     query(collection(db, 'classes'), where('teacherId', '==', teacherId)),
     (snap) => {
@@ -548,7 +565,10 @@ export function subscribeTeacherWorkspace(
     query(collection(db, 'exams'), where('teacherId', '==', teacherId)),
     (snap) => {
       const rows = snap.docs.map((d) => d.data() as Exam);
+      latestExams = rows;
+      examsReady = true;
       onExams(rows);
+      scheduleJournalSync();
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'exams')
   );
@@ -557,7 +577,10 @@ export function subscribeTeacherWorkspace(
     query(collection(db, 'submissions'), where('teacherId', '==', teacherId)),
     (snap) => {
       const rows = snap.docs.map((d) => d.data() as Submission);
+      latestSubs = rows;
+      subsReady = true;
       onSubmissions(rows);
+      scheduleJournalSync();
     },
     (err) => handleFirestoreError(err, OperationType.LIST, 'submissions')
   );
@@ -572,6 +595,9 @@ export function subscribeTeacherWorkspace(
   );
 
   return () => {
+    if (journalSyncTimer !== null) {
+      window.clearTimeout(journalSyncTimer);
+    }
     unsubClasses();
     unsubExams();
     unsubSubs();

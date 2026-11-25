@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   BarChart2,
   Camera,
@@ -8,6 +9,7 @@ import {
   Copy,
   MessageSquare,
   Save,
+  ShieldAlert,
   Sparkles,
   Table2,
   Trash2,
@@ -26,6 +28,7 @@ import {
   gradeEssayWithAi,
 } from '../services/geminiService';
 import type { EssayCriterionResult, Exam, StudentAnswer, Submission } from '../types';
+import { analyzeSubmissionEffort } from '../utils/effortAnalysis';
 import {
   buildDefaultParentMessage,
   formatDurationMMSS,
@@ -204,6 +207,18 @@ export function SubmissionDetailView({
   );
   const tier = getScoreTier(computedTotal, submission.maxScore);
   const fastGuessCount = analytics.fastGuesses.length;
+  const effortAnalysis = useMemo(
+    () =>
+      analyzeSubmissionEffort(
+        {
+          ...submission,
+          totalScore: computedTotal,
+          answers,
+        },
+        exam
+      ),
+    [submission, computedTotal, answers, exam]
+  );
 
   const handleScoreChange = (questionId: string, newScoreRaw: string, max: number) => {
     const num = parseFloat(newScoreRaw.replace(',', '.'));
@@ -299,6 +314,11 @@ export function SubmissionDetailView({
         maxScore: submission.maxScore,
         durationSeconds: submission.durationSeconds,
         violationCount: submission.violationCount,
+        effortSummary: {
+          level: effortAnalysis.label,
+          riskScore: effortAnalysis.riskScore,
+          reasons: effortAnalysis.reasons,
+        },
         questionSummaries: summaries,
       });
       setAiAnalysis(data.analysis || '');
@@ -552,6 +572,44 @@ export function SubmissionDetailView({
             {fastGuessCount} câu trả lời dưới 5s – nghi chọn đại
           </div>
         )}
+
+        {/* Effort & Perfunctory Behavior Diagnostic Card */}
+        <div
+          className={`p-4 rounded-2xl border text-xs space-y-1.5 ${
+            effortAnalysis.level === 'perfunctory'
+              ? 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
+              : effortAnalysis.level === 'watch'
+                ? 'bg-[#FDF8EB] border-[#EAD8A6] text-[#7A580B]'
+                : 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0A362C]'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-bold text-sm flex items-center gap-2">
+              {effortAnalysis.level === 'perfunctory' ? (
+                <ShieldAlert className="w-4 h-4 shrink-0 text-[#DC2626]" />
+              ) : effortAnalysis.level === 'watch' ? (
+                <AlertTriangle className="w-4 h-4 shrink-0 text-[#C89B2B]" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-[#0F6D4F]" />
+              )}
+              <span>Đánh giá thái độ làm bài: {effortAnalysis.label}</span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-md bg-white border border-current/25 font-mono font-semibold tabular-nums">
+              Chỉ số rủi ro đối phó: {effortAnalysis.riskScore}/100
+            </span>
+          </div>
+          {effortAnalysis.reasons.length > 0 ? (
+            <ul className="list-disc pl-5 space-y-0.5 leading-relaxed">
+              {effortAnalysis.reasons.map((r, rIdx) => (
+                <li key={rIdx}>{r}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="leading-relaxed">
+              Không phát hiện dấu hiệu làm đối phó. Học sinh trả lời đầy đủ và phân bổ thời gian ổn định.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Per-question & Response-Time Data Analytics Card */}

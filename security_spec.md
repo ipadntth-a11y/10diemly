@@ -7,7 +7,8 @@
 4. An `Exam` at `/exams/{examId}` can only be created, updated, or deleted by its `teacherId == request.auth.uid`. Verified signed-in users may read/list an exam only if `resource.data.teacherId == request.auth.uid || resource.data.isPublished == true`.
 5. A `Submission` at `/submissions/{submissionId}` must reference an existing `Exam` (`exists(/databases/.../exams/$(incoming().examId))`). Only the submitting student (`studentUid == request.auth.uid`) or the exam's teacher (`teacherId == request.auth.uid`) can read it. On `create`, `studentUid` must equal `request.auth.uid`, and `teacherId` must match the referenced exam's `teacherId`. Only the owning `teacherId` can update `totalScore`, `teacherComment`, `aiAnalysis`, `status`, or `answers` scores.
 6. A `ParentMessage` at `/parentMessages/{messageId}` contains PII (`parentPhone`) and is strictly readable and writable only by its owning `teacherId == request.auth.uid`.
-7. All document IDs match `^[a-zA-Z0-9_\-]+$` (<= 128 chars), all strings enforce explicit `.size()` bounds, all arrays enforce `.size() <= MAX`, and all `createdAt`/`updatedAt`/`submittedAt` timestamps equal `request.time` on creation/update.
+7. A `ReferenceMaterial` at `/referenceMaterials/{materialId}` contains zero PII (only pedagogical question banks, formulas, and explanations) and can only be created, updated, or deleted by its owning `teacherId == request.auth.uid`. Reads/queries by students are permitted only when `resource.data.isActiveForAi == true`.
+8. All document IDs match `^[a-zA-Z0-9_\-]+$` (<= 128 chars), all strings enforce explicit `.size()` bounds, all arrays enforce `.size() <= MAX`, and all `createdAt`/`updatedAt`/`submittedAt` timestamps equal `request.time` on creation/update.
 
 ## 2. The "Dirty Dozen" Payloads (All Must Return PERMISSION_DENIED)
 1. **Unauthenticated read/write**: Unauthenticated client requests `get /classes/cls_1` or `create /exams/ex_1`.

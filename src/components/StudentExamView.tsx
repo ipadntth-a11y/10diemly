@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   ArrowLeft,
+  BarChart2,
   BookOpen,
   Camera,
   CheckCircle2,
@@ -17,7 +18,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { PHYSICS_12_QUESTIONS } from '../data/seedData';
 import {
@@ -28,21 +29,36 @@ import {
   normalizeShortNumeric,
   normalizeStudentCode,
   submitStudentExam,
+  updateSubmissionGrading,
 } from '../services/firestoreService';
 import {
   generateRemedialPracticeWithAi,
   generateStudentReviewWithAi,
   gradeEssayWithAi,
 } from '../services/geminiService';
+import {
+  fetchActiveReferenceMaterialsForTeacher,
+  selectRelevantReferenceContext,
+} from '../services/referenceBankService';
+import {
+  attachAiReviewToLocalJournalEntry,
+  buildStudentJournalEntry,
+  loadStudentLearningHistory,
+  upsertLocalJournalEntry,
+} from '../services/studentJournalService';
 import type {
   ClassRoster,
   ClassRosterEntry,
   Classroom,
   Exam,
   ExamQuestion,
+  ReferenceMaterial,
   StudentAnswer,
+  StudentJournalEntry,
   Submission,
 } from '../types';
+import { getSubmissionScore10 } from '../utils/classStats';
+import { analyzeSubmissionEffort } from '../utils/effortAnalysis';
 import { formatDurationMMSS, formatScore } from '../utils/formatters';
 import { compressExamPhoto } from '../utils/imageUtils';
 import {
@@ -53,6 +69,7 @@ import {
   RemedialPracticePanel,
   type RemedialPracticeData,
 } from './RemedialPracticePanel';
+import { StudentProgressView } from './StudentProgressView';
 import {
   isExamAssignedToClass,
   isExamRestrictedToClasses,
@@ -66,6 +83,7 @@ interface StudentExamViewProps {
   initialClassCode?: string;
   teacherExams?: Exam[];
   teacherClasses?: Classroom[];
+  teacherReferenceMaterials?: ReferenceMaterial[];
   isTeacherPreview?: boolean;
   onExit: () => void;
   onSignInRequest: () => Promise<void>;
@@ -97,6 +115,7 @@ export function StudentExamView({
   initialClassCode,
   teacherExams = [],
   teacherClasses = [],
+  teacherReferenceMaterials,
   isTeacherPreview = false,
   onExit,
   onSignInRequest,
@@ -172,6 +191,13 @@ export function StudentExamView({
   const [practiceData, setPracticeData] = useState<RemedialPracticeData | null>(null);
   const [practiceLoading, setPracticeLoading] = useState(false);
   const [practiceError, setPracticeError] = useState<string | null>(null);
+  const [essayAutoError, setEssayAutoError] = useState<string | null>(null);
+  const [retryingEssayAi, setRetryingEssayAi] = useState(false);
+
+  // Student learning overview & journal state
+  const [studentPage, setStudentPage] = useState<'exam' | 'progress'>('exam');
+  const [journalEntries, setJournalEntries] = useState<StudentJournalEntry[]>([]);
+  const [journalLoading, setJournalLoading] = useState(false);
 
   // Fullscreen & anti-cheat state
   const MAX_ALLOWED_EXITS = 3;
@@ -240,6 +266,86 @@ export function StudentExamView({
       }
     }
   }, [availableExams, initialExamCode, selectedExam]);
+
+  const resolvedGuestStudentUid = useMemo(() => {
+    if (verifiedStudent) return `code_${verifiedStudent.studentCode}`;
+    if (loadedRoster && selectedRosterEntry) {
+      const cleanId = selectedRosterEntry.id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
+      return `cls_${loadedRoster.joinCode}_${cleanId}`;
+    }
+    return undefined;
+  }, [verifiedStudent, loadedRoster, selectedRosterEntry]);
+
+  const resolvedStudentCode = useMemo(
+    () => verifiedStudent?.studentCode || selectedRosterEntry?.studentCode || undefined,
+    [verifiedStudent, selectedRosterEntry]
+  );
+
+  const examsByIdMap = useMemo(() => {
+    const map = new Map<string, Exam>();
+    availableExams.forEach((e) => map.set(e.id, e));
+    return map;
+  }, [availableExams]);
+
+  const refreshStudentJournal = useCallback(async () => {
+    const hasIdentity = Boolean(
+      user?.uid ||
+        resolvedStudentCode ||
+        resolvedGuestStudentUid ||
+        (studentName.trim() && !isTeacherPreview)
+    );
+    if (!hasIdentity) {
+      setJournalEntries([]);
+      return;
+    }
+    setJournalLoading(true);
+    try {
+      const teacherIds = Array.from(
+        new Set([
+          ...(loadedRoster?.teacherId ? [loadedRoster.teacherId] : []),
+          ...(verifiedStudent?.teacherId ? [verifiedStudent.teacherId] : []),
+          ...(selectedExam?.teacherId ? [selectedExam.teacherId] : []),
+          ...availableExams.map((e) => e.teacherId),
+        ])
+      );
+      const list = await loadStudentLearningHistory({
+        user,
+        teacherIds,
+        examsById: examsByIdMap,
+        studentCode: resolvedStudentCode,
+        studentUid: resolvedGuestStudentUid,
+        studentName: studentName.trim(),
+        className: className.trim(),
+      });
+      setJournalEntries(list);
+    } finally {
+      setJournalLoading(false);
+    }
+  }, [
+    user,
+    resolvedStudentCode,
+    resolvedGuestStudentUid,
+    studentName,
+    className,
+    isTeacherPreview,
+    loadedRoster,
+    verifiedStudent,
+    selectedExam,
+    availableExams,
+    examsByIdMap,
+  ]);
+
+  useEffect(() => {
+    if (phase === 'taking') return;
+    void refreshStudentJournal();
+  }, [
+    phase,
+    studentPage,
+    user?.uid,
+    resolvedStudentCode,
+    resolvedGuestStudentUid,
+    refreshStudentJournal,
+  ]);
 
   const verifyStudentCode = async (rawCode?: string) => {
     const code = normalizeStudentCode(rawCode ?? studentCodeInput);
@@ -662,6 +768,8 @@ export function StudentExamView({
     setStudentReview(null);
     setReviewError(null);
     setReviewLoading(false);
+    setEssayAutoError(null);
+    setRetryingEssayAi(false);
     setPracticeData(null);
     setPracticeError(null);
     setPracticeLoading(false);
@@ -675,7 +783,8 @@ export function StudentExamView({
     answers: StudentAnswer[],
     totalScore: number,
     maxScore: number,
-    durationSeconds: number
+    durationSeconds: number,
+    submissionIdForCache?: string
   ) => {
     setReviewLoading(true);
     setReviewError(null);
@@ -703,13 +812,27 @@ export function StudentExamView({
         durationSeconds,
         questionResults,
       });
-      setStudentReview({
+      const nextReview = {
         overallComment: String(data.overallComment || ''),
         strengths: String(data.strengths || ''),
         weaknesses: String(data.weaknesses || ''),
         pacingNote: String(data.pacingNote || ''),
         studyPlan: String(data.studyPlan || ''),
-      });
+      };
+      setStudentReview(nextReview);
+      if (submissionIdForCache) {
+        attachAiReviewToLocalJournalEntry(
+          submissionIdForCache,
+          {
+            studentCode: resolvedStudentCode,
+            studentUid: user ? user.uid : resolvedGuestStudentUid,
+            studentName: studentName.trim(),
+            className: className.trim(),
+          },
+          nextReview
+        );
+        void refreshStudentJournal();
+      }
     } catch (err) {
       setReviewError(
         err instanceof Error ? err.message : 'Lỗi kết nối khi phân tích nhận xét.'
@@ -790,16 +913,31 @@ export function StudentExamView({
     setPracticeLoading(true);
     setPracticeError(null);
     try {
+      const activeMaterials =
+        isTeacherPreview && teacherReferenceMaterials
+          ? teacherReferenceMaterials.filter((m) => m.isActiveForAi)
+          : await fetchActiveReferenceMaterialsForTeacher(exam.teacherId);
+
+      const referenceContext = selectRelevantReferenceContext({
+        materials: activeMaterials,
+        subject: exam.subject,
+        examTitle: exam.title,
+        queryTexts: wrongQuestions.map((w) => `${w.prompt} ${w.explanation}`),
+        maxItems: 8,
+      });
+
       const data = await generateRemedialPracticeWithAi({
         subject: exam.subject,
         examTitle: exam.title,
         wrongQuestions,
+        referenceContext,
       });
       setPracticeData({
         focusSummary: String(data.focusSummary || ''),
         practiceQuestions: Array.isArray(data.practiceQuestions)
           ? (data.practiceQuestions as RemedialPracticeData['practiceQuestions'])
           : [],
+        ...(data.referenceSources ? { referenceSources: data.referenceSources } : {}),
       });
     } catch (err) {
       setPracticeError(
@@ -901,20 +1039,23 @@ export function StudentExamView({
         };
       });
 
-      // Automatically grade answered essay questions by 4-step barem (formula, substitution/unit conversion, numeric answer, full unit)
-      const answeredEssayTargets = selectedExam.questions.filter((q) => {
-        if (q.type !== 'essay') return false;
-        const hasText = (shortAnswers[q.id] || '').trim().length > 0;
-        const hasImg = Boolean(shortAnswerImages[q.id] || essayAiImages[q.id]);
-        return hasText || hasImg;
-      });
+      // Automatically grade ALL essay questions immediately upon submission (parallel AI grading for text/photo + instant 0đ barem for blank essays)
+      const allEssayTargets = selectedExam.questions.filter((q) => q.type === 'essay');
+      let pendingEssayFailMsg: string | null = null;
 
-      if (answeredEssayTargets.length > 0) {
+      if (allEssayTargets.length > 0) {
+        const answeredCount = allEssayTargets.filter(
+          (q) =>
+            (shortAnswers[q.id] || '').trim().length > 0 ||
+            Boolean(shortAnswerImages[q.id] || essayAiImages[q.id])
+        ).length;
         setSubmittingNote(
-          `AI đang chấm ${answeredEssayTargets.length} câu tự luận theo barem...`
+          answeredCount > 0
+            ? `AI đang tự động chấm ${answeredCount} câu tự luận theo Barem 4 bước...`
+            : 'Đang hoàn tất chấm điểm bài thi...'
         );
         try {
-          const itemsPayload = answeredEssayTargets.map((q) => {
+          const itemsPayload = allEssayTargets.map((q) => {
             const aiImg = essayAiImages[q.id];
             return {
               questionId: q.id,
@@ -965,10 +1106,19 @@ export function StudentExamView({
               aiBreakdown: Array.isArray(hit.breakdown) ? hit.breakdown : [],
             };
           });
-        } catch {
-          // If AI grading fails or times out, fall back safely so submission persists as pending_essay
+
+          if (aiData.failedQuestionIds && aiData.failedQuestionIds.length > 0) {
+            pendingEssayFailMsg =
+              'Một số câu tự luận chưa thể chấm tự động do gián đoạn mạng. Bạn có thể bấm "AI tự chấm tự luận ngay" bên dưới.';
+          }
+        } catch (err) {
+          pendingEssayFailMsg =
+            err instanceof Error
+              ? err.message
+              : 'Không thể tự chấm tự luận do kết nối AI tạm gián đoạn. Bấm "AI tự chấm tự luận ngay" để thử lại.';
         }
       }
+      setEssayAutoError(pendingEssayFailMsg);
 
       setSubmittingNote('Đang lưu kết quả bài làm...');
 
@@ -1012,8 +1162,14 @@ export function StudentExamView({
         const max = Number(
           selectedExam.questions.reduce((sum, q) => sum + q.maxScore, 0).toFixed(2)
         );
+        const stillHasPendingEssay = gradedAnswers.some(
+          (a) =>
+            a.type === 'essay' &&
+            ((a.textAnswer ?? '').trim().length > 0 || Boolean(a.imageDataUrl)) &&
+            !a.aiFeedback
+        );
         finalResult = {
-          id: 'local_preview',
+          id: `local_${Date.now().toString(36)}`,
           examId: selectedExam.id,
           examTitle: selectedExam.title,
           teacherId: selectedExam.teacherId,
@@ -1023,7 +1179,7 @@ export function StudentExamView({
           className: className.trim(),
           durationSeconds: elapsedSeconds,
           violationCount: finalViolations,
-          status: 'graded',
+          status: stillHasPendingEssay ? 'pending_essay' : 'graded',
           totalScore: total,
           maxScore: max,
           teacherComment: '',
@@ -1033,6 +1189,10 @@ export function StudentExamView({
         };
         setSubmittedResult(finalResult);
       }
+
+      upsertLocalJournalEntry(buildStudentJournalEntry(finalResult, selectedExam));
+      void refreshStudentJournal();
+
       if (reason) setForcedReason(reason);
       setShowViolationModal(false);
       setNeedsPhotoReturnFullscreen(false);
@@ -1059,7 +1219,8 @@ export function StudentExamView({
           gradedAnswers,
           finalResult.totalScore,
           finalResult.maxScore,
-          finalResult.durationSeconds
+          finalResult.durationSeconds,
+          finalResult.id
         );
         if (hasWrongOrPartial) {
           await fetchRemedialPractice(selectedExam, gradedAnswers);
@@ -1069,6 +1230,103 @@ export function StudentExamView({
       setSubmitting(false);
       setSubmittingNote(null);
       isSubmittingRef.current = false;
+    }
+  };
+
+  const handleRetryAutoGradeEssays = async () => {
+    if (!selectedExam || !submittedResult || retryingEssayAi) return;
+    const ungradedEssays = selectedExam.questions.filter((q, idx) => {
+      if (q.type !== 'essay') return false;
+      const ans = submittedResult.answers[idx];
+      return !ans?.aiFeedback;
+    });
+    if (ungradedEssays.length === 0) return;
+
+    setRetryingEssayAi(true);
+    setEssayAutoError(null);
+    try {
+      const itemsPayload = ungradedEssays.map((q) => {
+        const ans = submittedResult.answers.find((a) => a.questionId === q.id);
+        const aiImg = essayAiImages[q.id];
+        return {
+          questionId: q.id,
+          prompt: q.prompt,
+          correctAnswer: q.correctAnswer || '',
+          explanation: q.explanation || '',
+          studentAnswer: ans?.textAnswer || '',
+          imageBase64: aiImg?.base64,
+          imageMimeType: aiImg?.mimeType,
+          imageDataUrl: !aiImg ? ans?.imageDataUrl : undefined,
+          maxScore: q.maxScore,
+        };
+      });
+
+      const aiData = await gradeEssayWithAi({
+        studentName: submittedResult.studentName || 'Học sinh',
+        examTitle: selectedExam.title,
+        items: itemsPayload,
+      });
+
+      const resultMap = new Map(
+        (aiData.results || []).map((r) => [r.questionId, r])
+      );
+      const nextAnswers = submittedResult.answers.map((ans) => {
+        const hit = resultMap.get(ans.questionId);
+        if (!hit) return ans;
+        const clamped = Math.min(Math.max(Number(hit.proposedScore || 0), 0), ans.maxScore);
+        return {
+          ...ans,
+          score: Number(clamped.toFixed(2)),
+          isCorrect: clamped >= ans.maxScore,
+          recognizedText: hit.recognizedText || '',
+          aiFeedback: hit.feedback || '',
+          aiBreakdown: Array.isArray(hit.breakdown) ? hit.breakdown : [],
+        };
+      });
+      const nextTotal = Number(
+        nextAnswers.reduce((s, a) => s + Number(a.score || 0), 0).toFixed(2)
+      );
+      const stillPending = nextAnswers.some(
+        (a) =>
+          a.type === 'essay' &&
+          ((a.textAnswer ?? '').trim().length > 0 || Boolean(a.imageDataUrl)) &&
+          !a.aiFeedback
+      );
+      const nextResult: Submission = {
+        ...submittedResult,
+        totalScore: nextTotal,
+        status: stillPending ? 'pending_essay' : 'graded',
+        answers: nextAnswers,
+      };
+      setSubmittedResult(nextResult);
+
+      if (user?.uid && user.uid === nextResult.teacherId && !nextResult.id.startsWith('local_')) {
+        await updateSubmissionGrading(nextResult.id, {
+          totalScore: nextTotal,
+          teacherComment: nextResult.teacherComment || '',
+          aiAnalysis: nextResult.aiAnalysis || '',
+          status: nextResult.status,
+          answers: nextAnswers,
+          parentPhone: nextResult.parentPhone || '',
+        });
+      }
+
+      upsertLocalJournalEntry(buildStudentJournalEntry(nextResult, selectedExam));
+      void refreshStudentJournal();
+      await fetchStudentReview(
+        selectedExam,
+        nextAnswers,
+        nextTotal,
+        nextResult.maxScore,
+        nextResult.durationSeconds,
+        nextResult.id
+      );
+    } catch (err) {
+      setEssayAutoError(
+        err instanceof Error ? err.message : 'Vẫn chưa thể kết nối AI chấm tự luận.'
+      );
+    } finally {
+      setRetryingEssayAi(false);
     }
   };
 
@@ -1103,6 +1361,38 @@ export function StudentExamView({
           ) : null}
         </div>
 
+        {phase !== 'taking' && (
+          <div className="flex items-center gap-1.5 bg-[#124E40] p-1 rounded-xl border border-[#C89B2B]/35 shrink-0">
+            <button
+              type="button"
+              onClick={() => setStudentPage('exam')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                studentPage === 'exam'
+                  ? 'bg-[#FDF8EB] text-[#0A362C]'
+                  : 'text-[#E3EFEA] hover:text-white'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Phòng thi</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudentPage('progress')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                studentPage === 'progress'
+                  ? 'bg-[#FDF8EB] text-[#0A362C]'
+                  : 'text-[#E3EFEA] hover:text-white'
+              }`}
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>
+                Tiến độ &amp; Tổng quan
+                {journalEntries.length > 0 ? ` (${journalEntries.length})` : ''}
+              </span>
+            </button>
+          </div>
+        )}
+
         {phase === 'taking' && (
           <div className="flex items-center gap-3 shrink-0">
             {!isFullscreen && (
@@ -1131,9 +1421,71 @@ export function StudentExamView({
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
-        {/* PHASE 1: SETUP */}
-        {phase === 'setup' && (
-          <div className="max-w-2xl mx-auto bg-white border border-[#DAE5E0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
+        {phase !== 'taking' && studentPage === 'progress' ? (
+          <StudentProgressView
+            studentName={studentName.trim() || user?.displayName || ''}
+            className={className.trim()}
+            studentCode={resolvedStudentCode}
+            entries={journalEntries}
+            loading={journalLoading}
+            onRefresh={() => void refreshStudentJournal()}
+            onGoToExamRoom={() => {
+              setStudentPage('exam');
+              setPhase('setup');
+            }}
+            onRetakeExam={(examId, examCode) => {
+              const found =
+                availableExams.find((e) => e.id === examId) ||
+                (examCode
+                  ? availableExams.find(
+                      (e) => e.examCode.toLowerCase() === examCode.toLowerCase()
+                    )
+                  : undefined);
+              if (found) {
+                setSelectedExam(found);
+              }
+              setStudentPage('exam');
+              setPhase('setup');
+            }}
+          />
+        ) : (
+          <>
+            {/* PHASE 1: SETUP */}
+            {phase === 'setup' && (
+              <div className="max-w-2xl mx-auto space-y-4">
+                {journalEntries.length > 0 && (
+                  <div className="rounded-2xl border border-[#C5DDD3] bg-gradient-to-r from-[#EFF7F3] to-[#FDF8EB] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5 text-xs">
+                      <div className="font-semibold text-[#0F4C3F] flex items-center gap-1.5">
+                        <BarChart2 className="w-4 h-4 text-[#C89B2B]" />
+                        <span>
+                          Hồ sơ học tập của {studentName.trim() || 'bạn'}: đã ghi nhận{' '}
+                          {journalEntries.length} lần làm bài
+                        </span>
+                      </div>
+                      <p className="text-[#4A615A] tabular-nums">
+                        Điểm TB:{' '}
+                        <strong className="text-[#0D221D]">
+                          {(
+                            journalEntries.reduce((s, e) => s + e.score10, 0) /
+                            journalEntries.length
+                          ).toFixed(2)}
+                          /10
+                        </strong>{' '}
+                        · Gần nhất: {journalEntries[0].examTitle} (
+                        {journalEntries[0].score10.toFixed(2)}/10)
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStudentPage('progress')}
+                      className="px-3.5 py-2 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] whitespace-nowrap cursor-pointer shrink-0"
+                    >
+                      Xem tiến độ &amp; nhật ký
+                    </button>
+                  </div>
+                )}
+              <div className="bg-white border border-[#DAE5E0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-[#EDF3F0]">
               <div>
                 <div className="text-xs font-semibold tracking-[0.08em] text-[#8A630D] uppercase">
@@ -1622,6 +1974,7 @@ export function StudentExamView({
                 Bắt đầu làm bài (Bật toàn màn hình)
               </button>
             </form>
+          </div>
           </div>
         )}
 
@@ -2540,6 +2893,15 @@ export function StudentExamView({
             );
           };
 
+          const hasEssaysInExam = selectedExam.questions.some((q) => q.type === 'essay');
+          const hasPendingEssays =
+            submittedResult.status === 'pending_essay' ||
+            selectedExam.questions.some(
+              (q, idx) => q.type === 'essay' && !submittedResult.answers[idx]?.aiFeedback
+            );
+          const resultEffort = analyzeSubmissionEffort(submittedResult, selectedExam);
+          const resultScore10 = getSubmissionScore10(submittedResult);
+
           return (
             <div className="space-y-6">
               {(forcedReason || submittedResult.violationCount > MAX_ALLOWED_EXITS) && (
@@ -2556,6 +2918,41 @@ export function StudentExamView({
                         `Bạn đã thoát quá ${MAX_ALLOWED_EXITS} lần trong lúc làm bài (${submittedResult.violationCount} lần), hệ thống đã ép buộc nộp bài tự động.`}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {(essayAutoError || hasPendingEssays) && (
+                <div className="p-4 rounded-2xl bg-[#FDF8EB] border border-[#EAD8A6] flex flex-wrap items-center justify-between gap-3 text-xs text-[#7A580B]">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[#B0831A]" />
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-[#0D221D]">
+                        Tự luận chưa hoàn tất chấm tự động
+                      </div>
+                      <p>
+                        {essayAutoError ||
+                          'Một số câu tự luận chưa được AI chấm điểm. Bấm nút bên phải để AI tự chấm theo Barem 4 bước ngay lập tức.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={retryingEssayAi}
+                    onClick={() => void handleRetryAutoGradeEssays()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0F4C3F] text-white font-semibold hover:bg-[#0A362C] disabled:opacity-60 cursor-pointer shrink-0"
+                  >
+                    {retryingEssayAi ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E5C665]" />
+                        <span>AI đang chấm tự luận...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-[#E5C665]" />
+                        <span>AI tự chấm tự luận ngay</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
 
@@ -2595,21 +2992,37 @@ export function StudentExamView({
                   </p>
                 </div>
 
-                <div className="text-left sm:text-right shrink-0">
+                <div className="text-left sm:text-right shrink-0 space-y-1">
                   <div className="text-xs font-semibold uppercase tracking-wider text-[#8A630D]">
-                    Điểm tạm tính
+                    {hasPendingEssays
+                      ? 'Điểm tạm tính'
+                      : hasEssaysInExam
+                        ? 'Điểm chính thức (AI đã tự chấm)'
+                        : 'Điểm chính thức'}
                   </div>
                   <div className="font-serif text-4xl font-semibold text-[#0F4C3F] tabular-nums">
                     {formatScore(submittedResult.totalScore)}/
                     {formatScore(submittedResult.maxScore)}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPhase('setup')}
-                    className="mt-2 text-xs font-semibold text-[#0F4C3F] hover:text-[#8A630D] hover:underline cursor-pointer"
-                  >
-                    Làm lại đề khác
-                  </button>
+                  <div className="text-xs text-[#597169] tabular-nums">
+                    Quy đổi thang 10: <strong className="text-[#0D221D]">{resultScore10.toFixed(2)}/10</strong>
+                  </div>
+                  <div className="flex flex-wrap sm:justify-end gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setStudentPage('progress')}
+                      className="text-xs font-semibold text-[#8A630D] hover:underline cursor-pointer"
+                    >
+                      Xem tiến độ học tập
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhase('setup')}
+                      className="text-xs font-semibold text-[#0F4C3F] hover:text-[#8A630D] hover:underline cursor-pointer"
+                    >
+                      Làm lại đề khác
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2645,13 +3058,6 @@ export function StudentExamView({
                   max: number;
                 }>;
 
-                const avgSecPerQ = Math.round(
-                  submittedResult.durationSeconds / Math.max(1, selectedExam.questions.length)
-                );
-                const rushedCount = submittedResult.answers.filter(
-                  (a) => a.timeSpentSeconds > 0 && a.timeSpentSeconds < 5
-                ).length;
-
                 return (
                   <section className="bg-white border border-[#DAE5E0] rounded-2xl p-5 sm:p-6 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2661,14 +3067,58 @@ export function StudentExamView({
                           Phân tích &amp; Nhận xét bài làm của bạn
                         </h2>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-[#4A615A] tabular-nums">
-                        <span>Tốc độ TB: {avgSecPerQ}s/câu</span>
-                        {rushedCount > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#4A615A] tabular-nums">
+                        <span>Tốc độ TB: {resultEffort.metrics.avgSecondsPerQuestion}s/câu</span>
+                        {resultEffort.metrics.fastGuessCount > 0 && (
                           <span className="px-2 py-0.5 rounded-md bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] font-semibold">
-                            {rushedCount} câu chọn nhanh (&lt;5s)
+                            {resultEffort.metrics.fastGuessCount} câu chọn nhanh (&lt;5s)
                           </span>
                         )}
                       </div>
+                    </div>
+
+                    {/* Student Effort & Pacing Diagnostic Banner */}
+                    <div
+                      className={`p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        resultEffort.level === 'perfunctory'
+                          ? 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
+                          : resultEffort.level === 'watch'
+                            ? 'bg-[#FDF8EB] border-[#EAD8A6] text-[#7A580B]'
+                            : 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0A362C]'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="font-bold flex items-center gap-1.5">
+                          {resultEffort.level === 'perfunctory' ? (
+                            <ShieldAlert className="w-4 h-4 shrink-0" />
+                          ) : resultEffort.level === 'watch' ? (
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-[#0F6D4F] shrink-0" />
+                          )}
+                          <span>
+                            Đánh giá thái độ &amp; nhịp độ làm bài: {resultEffort.label}
+                          </span>
+                        </div>
+                        {resultEffort.reasons.length > 0 ? (
+                          <ul className="list-disc pl-5 space-y-0.5 leading-relaxed">
+                            {resultEffort.reasons.map((r, rIdx) => (
+                              <li key={rIdx}>{r}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="leading-relaxed">
+                            Bạn phân bổ thời gian hợp lý, hoàn thành đầy đủ các phần thi và không có dấu hiệu làm vội đối phó.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setStudentPage('progress')}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-current/25 font-semibold whitespace-nowrap cursor-pointer self-start sm:self-center"
+                      >
+                        Đối chiếu lịch sử tiến độ
+                      </button>
                     </div>
 
                     {/* Instant section-by-section score breakdown */}
@@ -2705,7 +3155,8 @@ export function StudentExamView({
                               submittedResult.answers,
                               submittedResult.totalScore,
                               submittedResult.maxScore,
-                              submittedResult.durationSeconds
+                              submittedResult.durationSeconds,
+                              submittedResult.id
                             )
                           }
                           className="px-3 py-1 rounded-lg bg-white border border-[#FCA5A5] font-semibold text-[#991B1B] hover:bg-[#FEF2F2] cursor-pointer"
@@ -2863,6 +3314,8 @@ export function StudentExamView({
             </div>
           );
         })()}
+          </>
+        )}
       </main>
 
       {zoomImgUrl && (

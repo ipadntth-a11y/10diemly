@@ -160,4 +160,96 @@ export interface ClassRoster {
   updatedAt?: unknown;
 }
 
-export type TeacherNavTab = 'overview' | 'classes' | 'exams' | 'messages';
+export type TeacherNavTab =
+  | 'overview'
+  | 'classes'
+  | 'exams'
+  | 'reference_bank'
+  | 'messages';
+
+export type ReferenceDifficulty = 'nhan_biet' | 'thong_hieu' | 'van_dung';
+
+export interface ReferenceQuestionItem {
+  id: string;
+  type: QuestionType;
+  topicTag: string;
+  difficulty: ReferenceDifficulty;
+  prompt: string;
+  options?: string[];
+  correctOption?: number;
+  statements?: TrueFalseStatement[];
+  correctAnswer?: string;
+  explanation: string;
+}
+
+export interface ReferenceMaterial {
+  id: string;
+  teacherId: string;
+  title: string;
+  subject: string;
+  topic: string;
+  grade: string;
+  sourceFileName: string;
+  knowledgeSummary: string;
+  items: ReferenceQuestionItem[];
+  itemCount: number;
+  isActiveForAi: boolean;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export type EffortLevel = 'serious' | 'watch' | 'perfunctory';
+
+export interface StudentReviewSummary {
+  overallComment: string;
+  strengths: string;
+  weaknesses: string;
+  pacingNote: string;
+  studyPlan: string;
+}
+
+export interface StudentAttemptTypeStat {
+  type: QuestionType;
+  label: string;
+  count: number;
+  earned: number;
+  max: number;
+}
+
+export interface StudentJournalEntry {
+  submissionId: string;
+  examId: string;
+  examCode: string;
+  examTitle: string;
+  subject: string;
+  teacherId: string;
+  studentUid: string;
+  studentName: string;
+  className: string;
+  studentCode?: string;
+  totalScore: number;
+  maxScore: number;
+  score10: number;
+  durationSeconds: number;
+  violationCount: number;
+  status: 'graded' | 'pending_essay';
+  teacherComment: string;
+  effortLevel: EffortLevel;
+  effortRiskScore: number;
+  effortReasons: string[];
+  typeStats: StudentAttemptTypeStat[];
+  aiReview?: StudentReviewSummary;
+  submittedAtIso: string;
+}
+
+export interface StudentJournal {
+  id: string;
+  teacherId: string;
+  studentKey: string;
+  studentName: string;
+  className: string;
+  studentCode?: string;
+  entries: StudentJournalEntry[];
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}

@@ -3,7 +3,13 @@ import type {
   PracticeQuestion,
   RemedialPracticeData,
 } from '../components/RemedialPracticePanel';
-import type { EssayCriterionResult, ExamQuestion } from '../types';
+import type {
+  EssayCriterionResult,
+  ExamQuestion,
+  ReferenceDifficulty,
+  ReferenceQuestionItem,
+} from '../types';
+import type { ReferenceContextPayload } from './referenceBankService';
 
 const PRIMARY_MODEL = 'gemini-4-hydrogen';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite';
@@ -192,6 +198,11 @@ export interface AnalyzeStudentInput {
   maxScore: number;
   durationSeconds: number;
   violationCount: number;
+  effortSummary?: {
+    level: string;
+    riskScore: number;
+    reasons: string[];
+  };
   questionSummaries: Array<{
     questionNumber: number;
     type: string;
@@ -220,19 +231,29 @@ export async function analyzeStudentWithAi(
 
   try {
     const ai = getGeminiClient();
+    const effortBlock = input.effortSummary
+      ? `\nĐánh giá mức độ nghiêm túc (hệ thống tự động đo):
+- Phân loại: ${input.effortSummary.level} (điểm rủi ro đối phó: ${input.effortSummary.riskScore}/100)
+- Dấu hiệu ghi nhận: ${
+          input.effortSummary.reasons.length > 0
+            ? input.effortSummary.reasons.join('; ')
+            : 'Không có dấu hiệu làm đối phó'
+        }`
+      : '';
+
     const prompt = `Bạn là giáo viên THPT giàu kinh nghiệm đang phân tích sâu dữ liệu bài làm của học sinh "${input.studentName}" ở đề "${input.examTitle}".
 
 Tổng quan:
 - Điểm hiện tại: ${input.totalScore}/${input.maxScore}
 - Tổng thời gian làm bài: ${Math.floor(Number(input.durationSeconds || 0) / 60)} phút ${Number(input.durationSeconds || 0) % 60} giây
-- Số lần vi phạm chuyển tab: ${input.violationCount || 0}
+- Số lần vi phạm chuyển tab: ${input.violationCount || 0}${effortBlock}
 
 Dữ liệu chi tiết TỪNG CÂU HỎI và THỜI GIAN TRẢ LỜI (so với trung bình cả lớp):
 ${JSON.stringify(input.questionSummaries, null, 2)}
 
 Hãy phân tích sâu bằng tiếng Việt chuẩn sư phạm và trả về JSON gồm:
 1. "analysis": Báo cáo chi tiết theo 4 ý rõ ràng (dùng gạch đầu dòng ngắn gọn):
-   - Nhịp độ & hành vi làm bài theo thời gian (so sánh thời gian làm mỗi câu với TB lớp, chỉ rõ các câu trả lời quá nhanh <5s nghi chọn đại và các câu sa lầy mất nhiều thời gian nhưng vẫn sai).
+   - Nhịp độ & hành vi làm bài theo thời gian (so sánh thời gian làm mỗi câu với TB lớp, chỉ rõ các câu trả lời quá nhanh <5s nghi chọn đại/đối phó và các câu sa lầy mất nhiều thời gian nhưng vẫn sai).
    - Năng lực theo từng dạng câu (Trắc nghiệm, Đúng/Sai, Trả lời ngắn/Tự luận).
    - Các câu/mạch kiến thức học sinh đang hổng (nêu cụ thể số câu).
    - Lộ trình ôn tập 2 bước tiếp theo cho học sinh này.
@@ -297,6 +318,7 @@ export interface GradeEssayItemResult {
 export interface GradeEssayOutput {
   results: GradeEssayItemResult[];
   overallNote: string;
+  failedQuestionIds?: string[];
 }
 
 export async function gradeEssayWithAi(
@@ -306,69 +328,68 @@ export async function gradeEssayWithAi(
     throw new Error('Không có câu tự luận / ảnh bài làm để chấm.');
   }
 
-  try {
-    const ai = getGeminiClient();
-    const results: GradeEssayItemResult[] = [];
+  const ai = getGeminiClient();
 
-    for (const item of input.items) {
-      const maxS = Math.max(0.1, Number(item.maxScore || 1));
-      const imgInfo = item.imageBase64
-        ? {
-            mimeType: item.imageMimeType || 'image/jpeg',
-            data: item.imageBase64,
-          }
-        : extractBase64Payload(item.imageDataUrl || '');
+  const gradeSingleItem = async (
+    item: GradeEssayItemInput
+  ): Promise<GradeEssayItemResult> => {
+    const maxS = Math.max(0.1, Number(item.maxScore || 1));
+    const imgInfo = item.imageBase64
+      ? {
+          mimeType: item.imageMimeType || 'image/jpeg',
+          data: item.imageBase64,
+        }
+      : extractBase64Payload(item.imageDataUrl || '');
 
-      const hasTextAnswer = String(item.studentAnswer || '').trim().length > 0;
+    const hasTextAnswer = String(item.studentAnswer || '').trim().length > 0;
 
-      if (!imgInfo?.data && !hasTextAnswer) {
-        const q1 = Number((maxS * 0.25).toFixed(2));
-        const q2 = Number((maxS * 0.25).toFixed(2));
-        const q3 = Number((maxS * 0.25).toFixed(2));
-        const q4 = Number((maxS - q1 - q2 - q3).toFixed(2));
-        results.push({
-          questionId: String(item.questionId),
-          proposedScore: 0,
-          recognizedText: '(Học sinh bỏ trống bài làm)',
-          feedback: 'Học sinh chưa viết bài làm hoặc chưa đính kèm ảnh chụp bài giải.',
-          breakdown: [
-            {
-              criterion: 'Công thức áp dụng / Phương pháp giải',
-              score: 0,
-              maxScore: q1,
-              met: false,
-            },
-            { criterion: 'Thay số & Đổi đơn vị chuẩn', score: 0, maxScore: q2, met: false },
-            { criterion: 'Đáp số chính xác', score: 0, maxScore: q3, met: false },
-            { criterion: 'Đơn vị đầy đủ & Kết luận', score: 0, maxScore: q4, met: false },
-          ],
-        });
-        continue;
-      }
-
-      const parts: Array<
-        { text: string } | { inlineData: { mimeType: string; data: string } }
-      > = [];
-
-      if (imgInfo && imgInfo.data) {
-        parts.push({
-          inlineData: {
-            mimeType: imgInfo.mimeType,
-            data: imgInfo.data,
+    if (!imgInfo?.data && !hasTextAnswer) {
+      const q1 = Number((maxS * 0.25).toFixed(2));
+      const q2 = Number((maxS * 0.25).toFixed(2));
+      const q3 = Number((maxS * 0.25).toFixed(2));
+      const q4 = Number((maxS - q1 - q2 - q3).toFixed(2));
+      return {
+        questionId: String(item.questionId),
+        proposedScore: 0,
+        recognizedText: '(Học sinh bỏ trống bài làm)',
+        feedback: 'Học sinh bỏ trống bài làm tự luận (không viết lời giải hoặc ảnh chụp).',
+        breakdown: [
+          {
+            criterion: 'Công thức áp dụng / Phương pháp giải',
+            score: 0,
+            maxScore: q1,
+            met: false,
           },
-        });
-      }
+          { criterion: 'Thay số & Đổi đơn vị chuẩn', score: 0, maxScore: q2, met: false },
+          { criterion: 'Đáp số chính xác', score: 0, maxScore: q3, met: false },
+          { criterion: 'Đơn vị đầy đủ & Kết luận', score: 0, maxScore: q4, met: false },
+        ],
+      };
+    }
 
-      const baremText = [
-        item.barem,
-        input.customBarem,
-        item.correctAnswer,
-        item.explanation,
-      ]
-        .filter((v) => typeof v === 'string' && v.trim().length > 0)
-        .join('\n');
+    const parts: Array<
+      { text: string } | { inlineData: { mimeType: string; data: string } }
+    > = [];
 
-      const instruction = `Bạn là giáo viên THPT giàu kinh nghiệm chấm thi tự luận tại Việt Nam. Hãy chấm bài cho học sinh "${input.studentName}" trong đề "${input.examTitle || ''}" theo ĐÚNG BAREM CHI TIẾT.
+    if (imgInfo && imgInfo.data) {
+      parts.push({
+        inlineData: {
+          mimeType: imgInfo.mimeType,
+          data: imgInfo.data,
+        },
+      });
+    }
+
+    const baremText = [
+      item.barem,
+      input.customBarem,
+      item.correctAnswer,
+      item.explanation,
+    ]
+      .filter((v) => typeof v === 'string' && v.trim().length > 0)
+      .join('\n');
+
+    const instruction = `Bạn là giáo viên THPT giàu kinh nghiệm chấm thi tự luận tại Việt Nam. Hãy chấm bài cho học sinh "${input.studentName}" trong đề "${input.examTitle || ''}" theo ĐÚNG BAREM CHI TIẾT.
 ${imgInfo ? 'Học sinh CÓ đính kèm ảnh chụp bài làm viết tay ở trên. Hãy đọc thật kỹ từng dòng chữ viết tay, ký hiệu công thức, bước đổi đơn vị, phép thay số, kết quả số và ĐƠN VỊ ở cuối bài làm.' : ''}
 
 Thông tin câu hỏi & Barem:
@@ -391,76 +412,95 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
 4. "proposedScore": Tổng điểm đạt được từ breakdown (từ 0 đến ${maxS}).
 5. "feedback": Nhận xét rõ từng mục: công thức đã đúng chưa, thay số/đổi đơn vị ra sao, đáp số thế nào, có thiếu/sai đơn vị không, và hướng dẫn cách sửa ngắn gọn (dùng $...$ cho công thức).`;
 
-      parts.push({ text: instruction });
+    parts.push({ text: instruction });
 
-      const response = await generateContentWithRetry(ai, {
-        contents: { parts },
-        timeoutMs: 25_000,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              recognizedText: { type: Type.STRING },
-              proposedScore: { type: Type.NUMBER },
-              feedback: { type: Type.STRING },
-              breakdown: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    criterion: { type: Type.STRING },
-                    score: { type: Type.NUMBER },
-                    maxScore: { type: Type.NUMBER },
-                    met: { type: Type.BOOLEAN },
-                  },
-                  required: ['criterion', 'score', 'maxScore', 'met'],
+    const response = await generateContentWithRetry(ai, {
+      contents: { parts },
+      timeoutMs: 24_000,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            recognizedText: { type: Type.STRING },
+            proposedScore: { type: Type.NUMBER },
+            feedback: { type: Type.STRING },
+            breakdown: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  criterion: { type: Type.STRING },
+                  score: { type: Type.NUMBER },
+                  maxScore: { type: Type.NUMBER },
+                  met: { type: Type.BOOLEAN },
                 },
+                required: ['criterion', 'score', 'maxScore', 'met'],
               },
             },
-            required: ['recognizedText', 'proposedScore', 'feedback', 'breakdown'],
           },
+          required: ['recognizedText', 'proposedScore', 'feedback', 'breakdown'],
         },
-      });
+      },
+    });
 
-      const parsed = parseAiJson<{
-        recognizedText?: string;
-        proposedScore?: number;
-        feedback?: string;
-        breakdown?: EssayCriterionResult[];
-      }>(response.text);
+    const parsed = parseAiJson<{
+      recognizedText?: string;
+      proposedScore?: number;
+      feedback?: string;
+      breakdown?: EssayCriterionResult[];
+    }>(response.text);
 
-      const rawBreakdown = Array.isArray(parsed.breakdown) ? parsed.breakdown : [];
-      const sumBreakdown = rawBreakdown.reduce(
-        (s: number, b: { score?: number }) => s + Number(b?.score || 0),
-        0
-      );
-      const effectiveScore =
-        rawBreakdown.length > 0 && sumBreakdown >= 0
-          ? sumBreakdown
-          : Number(parsed.proposedScore || 0);
-      const clampedScore = Math.min(Math.max(effectiveScore, 0), maxS);
+    const rawBreakdown = Array.isArray(parsed.breakdown) ? parsed.breakdown : [];
+    const sumBreakdown = rawBreakdown.reduce(
+      (s: number, b: { score?: number }) => s + Number(b?.score || 0),
+      0
+    );
+    const effectiveScore =
+      rawBreakdown.length > 0 && sumBreakdown >= 0
+        ? sumBreakdown
+        : Number(parsed.proposedScore || 0);
+    const clampedScore = Math.min(Math.max(effectiveScore, 0), maxS);
 
-      results.push({
-        questionId: String(item.questionId),
-        proposedScore: Number(clampedScore.toFixed(2)),
-        recognizedText: String(parsed.recognizedText || ''),
-        feedback: String(parsed.feedback || ''),
-        breakdown: rawBreakdown,
-      });
+    return {
+      questionId: String(item.questionId),
+      proposedScore: Number(clampedScore.toFixed(2)),
+      recognizedText: String(parsed.recognizedText || ''),
+      feedback: String(parsed.feedback || ''),
+      breakdown: rawBreakdown,
+    };
+  };
+
+  const settled = await Promise.allSettled(input.items.map(gradeSingleItem));
+  const results: GradeEssayItemResult[] = [];
+  const failedQuestionIds: string[] = [];
+  let firstError: unknown = null;
+
+  settled.forEach((outcome, idx) => {
+    if (outcome.status === 'fulfilled') {
+      results.push(outcome.value);
+    } else {
+      failedQuestionIds.push(String(input.items[idx].questionId));
+      if (!firstError) firstError = outcome.reason;
     }
+  });
 
-    const overallNote =
-      results.length === 1
-        ? results[0].feedback
-        : `Đã chấm xong ${results.length} câu tự luận theo barem. ${results
-            .map((r) => `${r.questionId.toUpperCase()}: ${r.proposedScore}đ`)
-            .join(', ')}.`;
-
-    return { results, overallNote };
-  } catch (error) {
-    throw toFriendlyAiError(error);
+  if (results.length === 0 && firstError) {
+    throw toFriendlyAiError(firstError);
   }
+
+  const overallNote =
+    results.length === 1
+      ? results[0].feedback
+      : `Đã chấm xong ${results.length} câu tự luận theo barem. ${results
+          .map((r) => `${r.questionId.toUpperCase()}: ${r.proposedScore}đ`)
+          .join(', ')}.`;
+
+  return {
+    results,
+    overallNote,
+    ...(failedQuestionIds.length > 0 ? { failedQuestionIds } : {}),
+  };
 }
 
 // 3. Standalone Photo Essay Grader
@@ -591,6 +631,7 @@ export interface GenerateExamInput {
   tfCount?: number;
   shortCount?: number;
   essayCount?: number;
+  referenceContext?: ReferenceContextPayload;
 }
 
 export interface GenerateExamOutput {
@@ -612,6 +653,18 @@ export async function generateExamWithAi(
     const totalShort = Math.min(Math.max(Number(input.shortCount ?? 1), 0), 4);
     const totalEssay = Math.min(Math.max(Number(input.essayCount ?? 1), 0), 4);
 
+    const hasRef = Boolean(
+      input.referenceContext &&
+        (input.referenceContext.knowledgeSnippets.length > 0 ||
+          input.referenceContext.referenceItems.length > 0)
+    );
+
+    const refBlock = hasRef
+      ? `\n\nNGUỒN DỮ LIỆU CHUẨN DO GIÁO VIÊN CUNG CẤP (ƯU TIÊN THAM CHIẾU):
+- Hãy bám sát công thức, ký hiệu, đơn vị, mức độ và cấu trúc câu hỏi trong kho chuẩn dưới đây (có thể biến tấu số liệu/ngữ cảnh tương đương hoặc tham khảo trực tiếp dạng toán chuẩn):
+${input.referenceContext!.knowledgeSnippets.length > 0 ? `Kiến thức & công thức trọng tâm:\n${input.referenceContext!.knowledgeSnippets.join('\n\n')}\n` : ''}${input.referenceContext!.referenceItems.length > 0 ? `Câu hỏi mẫu chuẩn:\n${JSON.stringify(input.referenceContext!.referenceItems, null, 2)}` : ''}`
+      : '';
+
     const prompt = `Bạn là chuyên gia ra đề kiểm tra theo Chương trình GDPT 2018 của Việt Nam.
 Hãy soạn bộ câu hỏi môn "${input.subject}" về chủ đề: "${input.topic}".
 Số lượng yêu cầu:
@@ -620,7 +673,7 @@ Số lượng yêu cầu:
 - ${totalShort} câu Trả lời ngắn điền số tối đa 4 ký tự (type: "short_answer", maxScore: 0.5, có correctAnswer là giá trị số ngắn gọn tối đa 4 ký tự như "2,5" hoặc "668" hoặc "-12").
 - ${totalEssay} câu Tự luận (type: "essay", maxScore: 1.0, có trường explanation là Hướng dẫn giải từng bước rõ ràng, chi tiết).
 Mỗi câu PHẢI có trường "explanation" (Hướng dẫn giải ngắn gọn, chính xác, dễ hiểu).
-Quy tắc công thức Toán/Vật lí/Hoá học: Tất cả biểu thức, phân số, căn thức, luỹ thừa, tích phân, vectơ, hệ phương trình PHẢI viết bằng LaTeX đặt trong $...$ (inline) hoặc $$...$$ (display) và escape dấu backslash đúng chuẩn JSON (\\frac, \\sqrt, \\int, \\overrightarrow...).`;
+Quy tắc công thức Toán/Vật lí/Hoá học: Tất cả biểu thức, phân số, căn thức, luỹ thừa, tích phân, vectơ, hệ phương trình PHẢI viết bằng LaTeX đặt trong $...$ (inline) hoặc $$...$$ (display) và escape dấu backslash đúng chuẩn JSON (\\frac, \\sqrt, \\int, \\overrightarrow...).${refBlock}`;
 
     const response = await generateContentWithRetry(ai, {
       contents: prompt,
@@ -927,6 +980,7 @@ export interface GenerateRemedialPracticeInput {
   subject?: string;
   examTitle?: string;
   wrongQuestions: RemedialWrongQuestionInput[];
+  referenceContext?: ReferenceContextPayload;
 }
 
 export async function generateRemedialPracticeWithAi(
@@ -941,9 +995,23 @@ export async function generateRemedialPracticeWithAi(
     const cappedWrong = input.wrongQuestions.slice(0, 6);
     const targetCount = Math.min(Math.max(cappedWrong.length, 3), 6);
 
+    const refCtx = input.referenceContext;
+    const hasRefData = Boolean(
+      refCtx &&
+        (refCtx.knowledgeSnippets.length > 0 || refCtx.referenceItems.length > 0)
+    );
+
+    const referenceInstruction = hasRefData
+      ? `\n\nNGUỒN DỮ LIỆU CHUẨN DO GIÁO VIÊN CUNG CẤP (BẮT BUỘC ƯU TIÊN THAM CHIẾU):
+- Giáo viên đã nạp Kho dữ liệu chuẩn bên dưới gồm kiến thức trọng tâm và câu hỏi mẫu chuẩn.
+- Hãy ưu tiên chọn dạng toán, công thức, ký hiệu, đơn vị và phương pháp giải từ Kho chuẩn khớp với từng câu sai của học sinh (bạn có thể giữ nguyên mô hình bài toán chuẩn rồi thay số/tình huống tương đương, hoặc bám sát câu mẫu chuẩn nhưng KHÔNG trùng nguyên văn câu học sinh vừa sai trong bài thi).
+- Lời giải ("explanation") phải giải chi tiết đúng chuẩn công thức trong tài liệu của giáo viên.
+${refCtx!.knowledgeSnippets.length > 0 ? `\n[Tóm tắt kiến thức & công thức chuẩn]\n${refCtx!.knowledgeSnippets.join('\n\n')}\n` : ''}${refCtx!.referenceItems.length > 0 ? `\n[Ngân hàng câu hỏi mẫu chuẩn liên quan]\n${JSON.stringify(refCtx!.referenceItems, null, 2)}` : ''}`
+      : '';
+
     const prompt = `Bạn là gia sư AI tâm huyết hỗ trợ học sinh THPT ôn tập ngay sau khi vừa làm xong bài kiểm tra "${input.examTitle || ''}" (môn "${input.subject || 'Tổng hợp'}").
 Dưới đây là các câu mà học sinh vừa LÀM SAI (kèm lựa chọn sai của học sinh và đáp án đúng):
-${JSON.stringify(cappedWrong, null, 2)}
+${JSON.stringify(cappedWrong, null, 2)}${referenceInstruction}
 
 Hãy phân tích lỗ hổng kiến thức gây ra các câu sai trên và soạn bộ ${targetCount} câu hỏi ÔN TẬP TƯƠNG TỰ MỚI (thay số liệu / bối cảnh / cách hỏi tương đương để học sinh luyện lại đúng dạng kiến thức vừa hổng, KHÔNG chép nguyên văn câu cũ).
 
@@ -954,7 +1022,7 @@ Quy tắc:
    - "true_false": 4 mệnh đề a, b, c, d ("statements" gồm 4 phần tử { text, isTrue }).
    - "short_answer": điền số ngắn gọn tối đa 4 ký tự vào "correctAnswer" (ví dụ "2,5" hoặc "120" hoặc "-4").
    Ưu tiên phân bổ theo đúng dạng của câu học sinh làm sai (nếu câu sai là tự luận thì tạo câu trắc nghiệm hoặc trả lời ngắn kiểm tra lại từng bước kiến thức cốt lõi của câu đó).
-3. Mỗi câu BẮT BUỘC có "explanation" hướng dẫn giải chi tiết từng bước.
+3. Mỗi câu BẮT BUỘC có "explanation" hướng dẫn giải chi tiết từng bước và kiểm tra lại thật kỹ tính toán để đáp án đúng là chính xác tuyệt đối.
 4. Tất cả công thức Toán/Lí/Hoá viết bằng LaTeX chuẩn trong $...$ hoặc $$...$$ (escape \\ đúng chuẩn JSON).`;
 
     const response = await generateContentWithRetry(ai, {
@@ -1070,6 +1138,14 @@ Quy tắc:
           'Bộ câu hỏi được cá nhân hoá theo những câu bạn vừa làm sai.'
       ),
       practiceQuestions: normalized,
+      ...(input.referenceContext && input.referenceContext.matchedTitles.length > 0
+        ? {
+            referenceSources: {
+              titles: input.referenceContext.matchedTitles,
+              sampleCount: input.referenceContext.referenceItems.length,
+            },
+          }
+        : {}),
     };
   } catch (error) {
     throw toFriendlyAiError(error);
@@ -1164,6 +1240,277 @@ Hãy trả về JSON với giọng văn thân thiện, khích lệ nhưng thẳn
       weaknesses: String(parsed.weaknesses || ''),
       pacingNote: String(parsed.pacingNote || ''),
       studyPlan: String(parsed.studyPlan || ''),
+    };
+  } catch (error) {
+    throw toFriendlyAiError(error);
+  }
+}
+
+// 9. Holistic cross-attempt progress analysis for Student Learning Journal
+export interface AnalyzeStudentProgressInput {
+  studentName: string;
+  className?: string;
+  attempts: Array<{
+    examTitle: string;
+    subject: string;
+    score10: number;
+    totalScore: number;
+    maxScore: number;
+    durationSeconds: number;
+    violationCount: number;
+    effortLevel: string;
+    dateLabel: string;
+  }>;
+  typeStats: Array<{
+    label: string;
+    pct: number;
+  }>;
+}
+
+export interface AnalyzeStudentProgressOutput {
+  learningStatus: string;
+  overallAssessment: string;
+  strengths: string;
+  patternsToFix: string;
+  nextGoalPlan: string;
+}
+
+export async function analyzeStudentProgressWithAi(
+  input: AnalyzeStudentProgressInput
+): Promise<AnalyzeStudentProgressOutput> {
+  if (!Array.isArray(input.attempts) || input.attempts.length === 0) {
+    throw new Error('Chưa có lịch sử làm bài để phân tích tiến độ.');
+  }
+
+  try {
+    const ai = getGeminiClient();
+    const recentAttempts = input.attempts.slice(0, 15);
+
+    const prompt = `Bạn là giáo viên cố vấn học tập THPT đang phân tích TOÀN BỘ QUÁ TRÌNH HỌC TẬP qua nhiều lần làm bài của học sinh "${input.studentName || 'em'}" (${input.className ? `Lớp ${input.className}` : 'học sinh tự do'}).
+
+Nhật ký các lần làm bài (xếp theo thời gian):
+${JSON.stringify(recentAttempts, null, 2)}
+
+Năng lực tổng hợp theo từng dạng câu hỏi:
+${JSON.stringify(input.typeStats, null, 2)}
+
+Hãy đánh giá toàn diện bằng tiếng Việt thân thiện, rõ ràng, truyền động lực nhưng thẳng thắn (xưng "thầy/cô", gọi "em"; công thức viết bằng $...$ nếu có) và trả về JSON gồm:
+1. "learningStatus": Nhãn ngắn gọn nhận định tình trạng hiện tại (VD: "Đang tiến bộ rõ rệt", "Phong độ ổn định ở mức khá", "Cần chấn chỉnh tốc độ & thái độ làm bài", "Cần củng cố nền tảng").
+2. "overallAssessment": Đánh giá tổng quan 2-3 câu về xu hướng điểm số (tăng/giảm/ổn định) và mức độ nghiêm túc qua các lần thi.
+3. "strengths": Dạng bài hoặc thói quen tích cực em đang giữ vững.
+4. "patternsToFix": Điểm yếu lặp lại qua nhiều bài (dạng câu hay mất điểm, hiện tượng chọn quá nhanh <5s hoặc bỏ trống tự luận nếu có).
+5. "nextGoalPlan": Mục tiêu điểm số và 2 bước hành động cụ thể cho lần thi tiếp theo.`;
+
+    const response = await generateContentWithRetry(ai, {
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            learningStatus: { type: Type.STRING },
+            overallAssessment: { type: Type.STRING },
+            strengths: { type: Type.STRING },
+            patternsToFix: { type: Type.STRING },
+            nextGoalPlan: { type: Type.STRING },
+          },
+          required: [
+            'learningStatus',
+            'overallAssessment',
+            'strengths',
+            'patternsToFix',
+            'nextGoalPlan',
+          ],
+        },
+      },
+    });
+
+    const parsed = parseAiJson<Partial<AnalyzeStudentProgressOutput>>(response.text);
+    return {
+      learningStatus: String(parsed.learningStatus || ''),
+      overallAssessment: String(parsed.overallAssessment || ''),
+      strengths: String(parsed.strengths || ''),
+      patternsToFix: String(parsed.patternsToFix || ''),
+      nextGoalPlan: String(parsed.nextGoalPlan || ''),
+    };
+  } catch (error) {
+    throw toFriendlyAiError(error);
+  }
+}
+
+// 10. Parse & normalize Word (.docx) reference material (question bank or topic handout)
+export interface ParseReferenceWordInput {
+  annotatedText: string;
+  subjectHint?: string;
+  titleHint?: string;
+}
+
+export interface ParseReferenceWordOutput {
+  title: string;
+  subject: string;
+  topic: string;
+  grade: string;
+  knowledgeSummary: string;
+  items: ReferenceQuestionItem[];
+}
+
+export async function parseReferenceWordWithAi(
+  input: ParseReferenceWordInput
+): Promise<ParseReferenceWordOutput> {
+  if (!input.annotatedText?.trim()) {
+    throw new Error('Thiếu nội dung văn bản từ file Word để chuẩn hoá.');
+  }
+
+  try {
+    const ai = getGeminiClient();
+    const prompt = `Bạn là chuyên gia biên tập ngân hàng câu hỏi & học liệu chuẩn GDPT 2018 cho môn "${input.subjectHint || 'Tổng hợp'}".
+Giáo viên vừa tải lên tài liệu Word (có thể là ngân hàng câu hỏi có đáp án gạch chân [U]...[/U] / bảng đáp án, hoặc chuyên đề lý thuyết + công thức + ví dụ minh hoạ).
+
+Nhiệm vụ của bạn:
+1. Tóm tắt phần kiến thức cốt lõi, định luật, công thức quan trọng, lưu ý bẫy thường gặp từ tài liệu vào "knowledgeSummary" (ngắn gọn, rõ ràng, có thể dùng LaTeX $...$).
+2. Trích xuất toàn bộ câu hỏi mẫu hoặc ví dụ bài tập trong tài liệu thành mảng "items" (tối đa 45 câu quan trọng nhất nếu file rất dài). Nếu tài liệu chủ yếu là lý thuyết mà ít câu hỏi, hãy tạo thêm 3-5 câu mẫu chuẩn bám sát chính lý thuyết/công thức trong tài liệu đó.
+3. Mỗi phần tử trong "items":
+   - "type": "mcq" | "true_false" | "short_answer" | "essay"
+   - "topicTag": Tên chuyên đề/dạng bài ngắn gọn của câu đó (VD: "Định luật Boyle", "Cực trị hàm số")
+   - "difficulty": "nhan_biet" | "thong_hieu" | "van_dung"
+   - "prompt": Nội dung câu hỏi (bỏ ký hiệu [U], [/U], [IMG_...])
+   - Với "mcq": "options" gồm đúng 4 chuỗi (không kèm A./B./C./D.), "correctOption" (0..3, ưu tiên đọc từ phần được đánh dấu [U]...[/U] hoặc bảng đáp án cuối bài).
+   - Với "true_false": "statements" gồm 4 phần tử { text, isTrue }.
+   - Với "short_answer": "correctAnswer" là đáp số ngắn gọn.
+   - "explanation": Lời giải chuẩn từng bước (nếu file gốc chưa ghi thì tự giải chi tiết theo đáp án đúng).
+4. Công thức Toán/Lí/Hoá PHẢI viết bằng LaTeX chuẩn đặt trong $...$ hoặc $$...$$ (escape \\ đúng chuẩn JSON).
+
+Tiêu đề gợi ý: "${input.titleHint || ''}"
+Nội dung trích xuất từ file Word:
+${input.annotatedText.slice(0, 42000)}`;
+
+    const response = await generateContentWithRetry(ai, {
+      contents: prompt,
+      timeoutMs: 28_000,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            subject: { type: Type.STRING },
+            topic: { type: Type.STRING },
+            grade: { type: Type.STRING },
+            knowledgeSummary: { type: Type.STRING },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: { type: Type.STRING },
+                  topicTag: { type: Type.STRING },
+                  difficulty: { type: Type.STRING },
+                  prompt: { type: Type.STRING },
+                  options: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  correctOption: { type: Type.INTEGER },
+                  statements: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        text: { type: Type.STRING },
+                        isTrue: { type: Type.BOOLEAN },
+                      },
+                    },
+                  },
+                  correctAnswer: { type: Type.STRING },
+                  explanation: { type: Type.STRING },
+                },
+                required: ['type', 'topicTag', 'difficulty', 'prompt', 'explanation'],
+              },
+            },
+          },
+          required: ['title', 'subject', 'topic', 'knowledgeSummary', 'items'],
+        },
+      },
+    });
+
+    const parsed = parseAiJson<{
+      title?: string;
+      subject?: string;
+      topic?: string;
+      grade?: string;
+      knowledgeSummary?: string;
+      items?: Array<Record<string, unknown>>;
+    }>(response.text);
+
+    const normalizedItems: ReferenceQuestionItem[] = Array.isArray(parsed.items)
+      ? parsed.items.slice(0, 60).map((raw, idx) => {
+          const rawType = String(raw.type || 'mcq');
+          const type: ReferenceQuestionItem['type'] =
+            rawType === 'true_false' ||
+            rawType === 'short_answer' ||
+            rawType === 'essay'
+              ? rawType
+              : 'mcq';
+          const rawDiff = String(raw.difficulty || 'thong_hieu');
+          const difficulty: ReferenceDifficulty =
+            rawDiff === 'nhan_biet' || rawDiff === 'van_dung'
+              ? rawDiff
+              : 'thong_hieu';
+          return {
+            id: `ref_ai_${idx + 1}_${Date.now().toString(36)}`,
+            type,
+            topicTag: String(raw.topicTag || parsed.topic || 'Chuyên đề chuẩn').slice(0, 120),
+            difficulty,
+            prompt: String(raw.prompt || '').slice(0, 2500),
+            ...(type === 'mcq'
+              ? {
+                  options:
+                    Array.isArray(raw.options) && raw.options.length >= 4
+                      ? raw.options.slice(0, 4).map((o) => String(o || '').slice(0, 600))
+                      : ['Phương án A', 'Phương án B', 'Phương án C', 'Phương án D'],
+                  correctOption:
+                    typeof raw.correctOption === 'number'
+                      ? Math.min(Math.max(Math.round(raw.correctOption), 0), 3)
+                      : 0,
+                }
+              : {}),
+            ...(type === 'true_false'
+              ? {
+                  statements:
+                    Array.isArray(raw.statements) && raw.statements.length >= 4
+                      ? raw.statements.slice(0, 4).map((st: unknown, sIdx: number) => {
+                          const sObj = (st && typeof st === 'object' ? st : {}) as {
+                            text?: unknown;
+                            isTrue?: unknown;
+                          };
+                          return {
+                            text: String(sObj.text || `Mệnh đề ${'abcd'[sIdx]}`).slice(0, 600),
+                            isTrue: Boolean(sObj.isTrue),
+                          };
+                        })
+                      : [
+                          { text: 'Mệnh đề a', isTrue: true },
+                          { text: 'Mệnh đề b', isTrue: false },
+                          { text: 'Mệnh đề c', isTrue: true },
+                          { text: 'Mệnh đề d', isTrue: false },
+                        ],
+                }
+              : {}),
+            ...(type === 'short_answer'
+              ? { correctAnswer: String(raw.correctAnswer || '').slice(0, 40) }
+              : {}),
+            explanation: String(raw.explanation || '').slice(0, 2500),
+          };
+        })
+      : [];
+
+    return {
+      title: String(parsed.title || input.titleHint || 'Tài liệu chuẩn AI').slice(0, 200),
+      subject: String(parsed.subject || input.subjectHint || 'Vật lí').slice(0, 80),
+      topic: String(parsed.topic || '').slice(0, 160),
+      grade: String(parsed.grade || 'THPT').slice(0, 40),
+      knowledgeSummary: String(parsed.knowledgeSummary || '').slice(0, 8000),
+      items: normalizedItems,
     };
   } catch (error) {
     throw toFriendlyAiError(error);

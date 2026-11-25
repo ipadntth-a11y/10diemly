@@ -32,6 +32,10 @@ export interface PracticeQuestion {
 export interface RemedialPracticeData {
   focusSummary: string;
   practiceQuestions: PracticeQuestion[];
+  referenceSources?: {
+    titles: string[];
+    sampleCount: number;
+  };
 }
 
 interface RemedialPracticePanelProps {
@@ -191,6 +195,15 @@ export function RemedialPracticePanel({
             text={practiceData.focusSummary}
             className="text-sm text-[#0D221D] leading-relaxed"
           />
+          {practiceData.referenceSources &&
+            practiceData.referenceSources.titles.length > 0 && (
+              <div className="text-xs text-[#4A615A] pt-1">
+                Tham chiếu Kho chuẩn: {practiceData.referenceSources.titles.join(', ')}
+                {practiceData.referenceSources.sampleCount > 0 && (
+                  <> · {practiceData.referenceSources.sampleCount} câu mẫu chuẩn</>
+                )}
+              </div>
+            )}
         </div>
         <button
           type="button"

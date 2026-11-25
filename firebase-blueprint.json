@@ -453,6 +453,115 @@
         }
       },
       "required": ["id", "teacherId", "classId", "className", "subject", "joinCode", "studentEntries", "createdAt", "updatedAt"]
+    },
+    "StudentJournal": {
+      "title": "StudentJournal",
+      "description": "Non-PII teacher-synced student learning journal summarizing chronological exam attempts, scores, and effort diagnostics",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "teacherId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "className": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "studentCode": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "entries": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "teacherId", "studentKey", "studentName", "className", "entries", "createdAt", "updatedAt"]
+    },
+    "ReferenceMaterial": {
+      "title": "ReferenceMaterial",
+      "description": "Teacher-curated standard question bank, formulas, and curriculum reference material extracted from Word (.docx) or authored manually to ground AI practice and exam generation",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "teacherId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "topic": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "grade": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "sourceFileName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "knowledgeSummary": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "items": {
+          "type": "array"
+        },
+        "itemCount": {
+          "type": "integer"
+        },
+        "isActiveForAi": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "teacherId", "title", "subject", "topic", "grade", "sourceFileName", "knowledgeSummary", "items", "itemCount", "isActiveForAi", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -487,6 +596,14 @@
     "/parentMessages/{messageId}": {
       "schema": { "$ref": "#/entities/ParentMessage" },
       "description": "Parent notification messages owned by teachers"
+    },
+    "/studentJournals/{journalId}": {
+      "schema": { "$ref": "#/entities/StudentJournal" },
+      "description": "Non-PII learning journal snapshots keyed by deterministic teacherId_studentKey"
+    },
+    "/referenceMaterials/{materialId}": {
+      "schema": { "$ref": "#/entities/ReferenceMaterial" },
+      "description": "Standard question banks and curriculum notes uploaded by teachers to ground AI generation"
     }
   }
 }

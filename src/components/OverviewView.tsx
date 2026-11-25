@@ -1,8 +1,11 @@
 import {
+  AlertTriangle,
   ArrowRight,
   BookOpen,
+  CheckCircle2,
   ClipboardCheck,
   GraduationCap,
+  ShieldAlert,
   Trash2,
   TrendingUp,
 } from 'lucide-react';
@@ -13,6 +16,7 @@ import {
 } from '../services/firestoreService';
 import type { Classroom, Exam, Submission } from '../types';
 import { resolveClassForSubmission } from '../utils/classStats';
+import { summarizeCohortEffort } from '../utils/effortAnalysis';
 import { formatDurationMMSS, formatScore } from '../utils/formatters';
 import { ClassStatsSection } from './ClassStatsSection';
 
@@ -69,6 +73,12 @@ export function OverviewView({
     return true;
   });
   const recentSubmissions = filteredRecentSource.slice(0, 8);
+  const cohortEffort = summarizeCohortEffort(filteredRecentSource, exams);
+  const flaggedAndWatchEffort = [
+    ...cohortEffort.flaggedItems,
+    ...cohortEffort.watchItems,
+  ];
+  const [effortTab, setEffortTab] = useState<'perfunctory' | 'all_flagged'>('perfunctory');
   const firstExam = exams[0];
 
   const handleConfirmDelete = async (subId: string) => {
@@ -168,6 +178,162 @@ export function OverviewView({
             : 'tong_hop'
         }
       />
+
+      {/* Perfunctory / Superficial Effort Analysis */}
+      <section className="bg-white border border-[#DAE5E0] rounded-2xl p-6 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-[#EBF1EE]">
+          <div>
+            <div className="text-[11px] font-semibold tracking-[0.1em] text-[#B91C1C] uppercase">
+              Giám sát chất lượng làm bài
+            </div>
+            <h2 className="font-serif text-xl font-semibold text-[#0D221D] mt-0.5">
+              Phân tích &amp; Phát hiện học sinh làm bài đối phó
+            </h2>
+            <p className="text-xs text-[#597169] mt-0.5">
+              Tự động phát hiện các bài nộp chọn đại (&lt;5s/câu), lặp một đáp án (toàn A/B/C/D), bỏ trống tự luận hoặc thoát màn hình nhiều lần.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs shrink-0">
+            <span className="px-2.5 py-1 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] font-semibold tabular-nums">
+              {cohortEffort.perfunctoryCount} đối phó
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-[#FDF8EB] border border-[#EAD8A6] text-[#8A630D] font-semibold tabular-nums">
+              {cohortEffort.watchCount} cần lưu ý
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-[#EFF7F3] border border-[#C5DDD3] text-[#0F6D4F] font-semibold tabular-nums">
+              {cohortEffort.seriousCount} nghiêm túc
+            </span>
+          </div>
+        </div>
+
+        {filteredRecentSource.length === 0 ? (
+          <div className="py-6 text-center text-xs text-[#597169]">
+            Chưa có bài nộp nào trong phạm vi lọc hiện tại để phân tích.
+          </div>
+        ) : flaggedAndWatchEffort.length === 0 ? (
+          <div className="p-4 rounded-xl bg-[#EFF7F3] border border-[#C5DDD3] flex items-center gap-2.5 text-xs text-[#0F4C3F]">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-[#0F6D4F]" />
+            <span>
+              Tất cả {filteredRecentSource.length} bài nộp đang xét đều thể hiện thái độ làm bài nghiêm túc, chưa phát hiện dấu hiệu làm đối phó.
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="inline-flex p-1 rounded-xl bg-[#E6EEEA] gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setEffortTab('perfunctory')}
+                className={`px-3 py-1 rounded-lg font-medium cursor-pointer ${
+                  effortTab === 'perfunctory'
+                    ? 'bg-white text-[#B91C1C] font-semibold shadow-xs'
+                    : 'text-[#4A615A]'
+                }`}
+              >
+                Làm đối phó rõ rệt ({cohortEffort.perfunctoryCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setEffortTab('all_flagged')}
+                className={`px-3 py-1 rounded-lg font-medium cursor-pointer ${
+                  effortTab === 'all_flagged'
+                    ? 'bg-white text-[#0D221D] font-semibold shadow-xs'
+                    : 'text-[#4A615A]'
+                }`}
+              >
+                Tất cả cần chú ý ({flaggedAndWatchEffort.length})
+              </button>
+            </div>
+
+            {(() => {
+              const displayItems =
+                effortTab === 'perfunctory'
+                  ? cohortEffort.flaggedItems
+                  : flaggedAndWatchEffort;
+              if (displayItems.length === 0) {
+                return (
+                  <div className="p-4 rounded-xl bg-[#F8FAF9] border border-[#EBF1EE] text-xs text-[#4A615A]">
+                    Không có học sinh nào ở mức đối phó rõ rệt; chuyển sang tab «Tất cả cần chú ý» để xem {cohortEffort.watchCount} bài cần lưu ý tốc độ.
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {displayItems.slice(0, 8).map(({ submission: sub, analysis }) => {
+                    const isPerfunctory = analysis.level === 'perfunctory';
+                    return (
+                      <div
+                        key={sub.id}
+                        className={`p-4 rounded-xl border space-y-2 ${
+                          isPerfunctory
+                            ? 'bg-[#FEF2F2]/60 border-[#FECACA]'
+                            : 'bg-[#FDF8EB]/70 border-[#EAD8A6]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {isPerfunctory ? (
+                                <ShieldAlert className="w-4 h-4 text-[#B91C1C] shrink-0" />
+                              ) : (
+                                <AlertTriangle className="w-4 h-4 text-[#8A630D] shrink-0" />
+                              )}
+                              <span className="font-semibold text-sm text-[#0D221D] truncate">
+                                {sub.studentName}
+                              </span>
+                              {sub.className && (
+                                <span className="text-xs text-[#4A615A]">
+                                  · Lớp {sub.className}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[#597169] truncate mt-0.5">
+                              {sub.examTitle} · {formatScore(sub.totalScore)}/{formatScore(sub.maxScore)}đ ·{' '}
+                              {formatDurationMMSS(sub.durationSeconds)}
+                            </div>
+                          </div>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0 tabular-nums border ${
+                              isPerfunctory
+                                ? 'bg-white border-[#FCA5A5] text-[#B91C1C]'
+                                : 'bg-white border-[#EAD8A6] text-[#8A630D]'
+                            }`}
+                          >
+                            Rủi ro {analysis.riskScore}%
+                          </span>
+                        </div>
+
+                        <ul className="list-disc pl-4 text-xs text-[#3A524A] space-y-0.5">
+                          {analysis.reasons.slice(0, 3).map((r, rIdx) => (
+                            <li key={rIdx}>{r}</li>
+                          ))}
+                        </ul>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <button
+                            type="button"
+                            onClick={() => onOpenSubmission(sub.id)}
+                            className="text-xs font-semibold text-[#0F4C3F] hover:underline cursor-pointer"
+                          >
+                            Xem chi tiết bài làm →
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(sub.id)}
+                            className="text-[11px] font-medium text-[#B91C1C] hover:underline cursor-pointer"
+                          >
+                            Xoá bài đối phó
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </section>
 
       {/* Main 2-column content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

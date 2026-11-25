@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  BookMarked,
   BookOpen,
   GraduationCap,
   LayoutGrid,
@@ -23,6 +24,7 @@ const NAV_ITEMS: { id: TeacherNavTab; label: string; icon: typeof LayoutGrid }[]
   { id: 'overview', label: 'Tổng quan', icon: LayoutGrid },
   { id: 'classes', label: 'Lớp & học sinh', icon: GraduationCap },
   { id: 'exams', label: 'Đề & bài chấm', icon: BookOpen },
+  { id: 'reference_bank', label: 'Kho chuẩn AI', icon: BookMarked },
   { id: 'messages', label: 'Tin nhắn phụ huynh', icon: MessageSquare },
 ];
 

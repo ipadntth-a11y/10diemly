@@ -2295,3 +2295,61 @@ export async function parseDocxExam(file: File): Promise<DocxParseResult> {
     warnings,
   };
 }
+
+export interface ReferenceDocxParseResult {
+  title: string;
+  subject: string;
+  questions: ParsedDocxQuestion[];
+  introKnowledgeText: string;
+  plainFullText: string;
+  annotatedTextForAi: string;
+  bottomAnswerCount: number;
+  underlineAnswerCount: number;
+  warnings: string[];
+}
+
+export async function parseDocxForReferenceBank(
+  file: File
+): Promise<ReferenceDocxParseResult> {
+  const examRes = await parseDocxExam(file);
+
+  const plainFullText = examRes.annotatedTextForAi
+    .replace(/\[IMG_\d+\]/g, '')
+    .replace(/\[\/?U\]/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const lines = plainFullText.split('\n');
+  const firstQIdx = lines.findIndex((ln) =>
+    /^(?:Câu|Bài)\s+\d+\s*(?:\([^)]*\))?\s*[:.]/i.test(ln.trim())
+  );
+  const introLines =
+    firstQIdx > 0
+      ? lines.slice(0, firstQIdx)
+      : examRes.questions.length === 0
+        ? lines
+        : [];
+  const introKnowledgeText = introLines
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 7500);
+
+  return {
+    title:
+      examRes.title === 'Đề kiểm tra từ file Word'
+        ? file.name.replace(/\.docx$/i, '').replace(/[_-]+/g, ' ').trim() ||
+          'Tài liệu chuẩn từ Word'
+        : examRes.title,
+    subject: examRes.subject,
+    questions: examRes.questions,
+    introKnowledgeText,
+    plainFullText,
+    annotatedTextForAi: examRes.annotatedTextForAi,
+    bottomAnswerCount: examRes.bottomAnswerCount,
+    underlineAnswerCount: examRes.underlineAnswerCount,
+    warnings: examRes.warnings,
+  };
+}
+

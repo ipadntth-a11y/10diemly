@@ -165,6 +165,42 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidStudentJournal(data) {
+      return data.keys().hasAll(['id', 'teacherId', 'studentKey', 'studentName', 'className', 'entries', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'teacherId', 'studentKey', 'studentName', 'className', 'studentCode', 'entries', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.teacherId)
+        && data.teacherId == request.auth.uid
+        && isValidId(data.studentKey)
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
+        && data.className is string && data.className.size() <= 80
+        && (!('studentCode' in data) || (data.studentCode is string && data.studentCode.size() <= 40))
+        && data.entries is list && data.entries.size() <= 60
+        && (data.entries.size() == 0 || data.entries[0] is map)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidReferenceMaterial(data) {
+      return data.keys().hasAll(['id', 'teacherId', 'title', 'subject', 'topic', 'grade', 'sourceFileName', 'knowledgeSummary', 'items', 'itemCount', 'isActiveForAi', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'teacherId', 'title', 'subject', 'topic', 'grade', 'sourceFileName', 'knowledgeSummary', 'items', 'itemCount', 'isActiveForAi', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.teacherId)
+        && data.teacherId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 80
+        && data.topic is string && data.topic.size() <= 160
+        && data.grade is string && data.grade.size() <= 40
+        && data.sourceFileName is string && data.sourceFileName.size() <= 200
+        && data.knowledgeSummary is string && data.knowledgeSummary.size() <= 8000
+        && data.items is list && data.items.size() <= 80
+        && (data.items.size() == 0 || data.items[0] is map)
+        && data.itemCount is int && data.itemCount >= 0 && data.itemCount <= 80
+        && data.isActiveForAi is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     // /users/{userId}
     match /users/{userId} {
       allow get: if isVerified() && isValidId(userId) && request.auth.uid == userId;
@@ -361,6 +397,49 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['parentPhone', 'content', 'status', 'updatedAt']);
       allow delete: if isVerified() && isValidId(messageId) && existing().teacherId == request.auth.uid;
+    }
+
+    // /studentJournals/{journalId}
+    match /studentJournals/{journalId} {
+      allow get: if isValidId(journalId);
+      allow list: if isVerified() && existing().teacherId == request.auth.uid;
+      allow create: if isVerified() && isValidId(journalId)
+        && isValidStudentJournal(incoming())
+        && incoming().id == journalId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(journalId)
+        && existing().teacherId == request.auth.uid
+        && isValidStudentJournal(incoming())
+        && incoming().id == existing().id
+        && incoming().teacherId == existing().teacherId
+        && incoming().studentKey == existing().studentKey
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['studentName', 'className', 'studentCode', 'entries', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(journalId) && existing().teacherId == request.auth.uid;
+    }
+
+    // /referenceMaterials/{materialId}
+    match /referenceMaterials/{materialId} {
+      allow get: if isValidId(materialId)
+        && ((isVerified() && existing().teacherId == request.auth.uid) || existing().isActiveForAi == true);
+      allow list: if (isVerified() && existing().teacherId == request.auth.uid)
+        || existing().isActiveForAi == true;
+      allow create: if isVerified() && isValidId(materialId)
+        && isValidReferenceMaterial(incoming())
+        && incoming().id == materialId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(materialId)
+        && existing().teacherId == request.auth.uid
+        && isValidReferenceMaterial(incoming())
+        && incoming().id == existing().id
+        && incoming().teacherId == existing().teacherId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'subject', 'topic', 'grade', 'sourceFileName', 'knowledgeSummary', 'items', 'itemCount', 'isActiveForAi', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(materialId) && existing().teacherId == request.auth.uid;
     }
   }
 }

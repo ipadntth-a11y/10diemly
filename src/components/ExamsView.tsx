@@ -1,9 +1,11 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BookOpen,
   Camera,
   Check,
+  CheckCircle2,
   Clock,
   Copy,
   Download,
@@ -13,6 +15,7 @@ import {
   Lock,
   Plus,
   Search,
+  ShieldAlert,
   Sparkles,
   Trash2,
   Unlock,
@@ -36,11 +39,21 @@ import {
   generateExplanationsWithAi,
   parseWordExamWithAi,
 } from '../services/geminiService';
-import type { Classroom, Exam, ExamQuestion, QuestionType, Submission } from '../types';
+import { selectRelevantReferenceContext } from '../services/referenceBankService';
+import type {
+  Classroom,
+  EffortLevel,
+  Exam,
+  ExamQuestion,
+  QuestionType,
+  ReferenceMaterial,
+  Submission,
+} from '../types';
 import {
   getSubmissionScore10,
   resolveClassForSubmission,
 } from '../utils/classStats';
+import { summarizeCohortEffort } from '../utils/effortAnalysis';
 import {
   parseDocxExam,
   type DocxParseResult,
@@ -59,6 +72,7 @@ interface ExamsViewProps {
   classes?: Classroom[];
   exams: Exam[];
   submissions: Submission[];
+  referenceMaterials?: ReferenceMaterial[];
   selectedExamId: string | null;
   onSelectExam: (examId: string | null) => void;
   onSelectSubmission: (submissionId: string) => void;
@@ -72,6 +86,7 @@ export function ExamsView({
   classes = [],
   exams,
   submissions,
+  referenceMaterials = [],
   selectedExamId,
   onSelectExam,
   onSelectSubmission,
@@ -80,6 +95,7 @@ export function ExamsView({
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [searchSub, setSearchSub] = useState('');
   const [classFilter, setClassFilter] = useState('all');
+  const [effortFilter, setEffortFilter] = useState<'all' | EffortLevel>('all');
   const [inspectedQuestionId, setInspectedQuestionId] = useState<string | null>(null);
   const [showPhotoGrader, setShowPhotoGrader] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
@@ -440,6 +456,13 @@ export function ExamsView({
     setGenerating(true);
     setCreateError(null);
     try {
+      const referenceContext = selectRelevantReferenceContext({
+        materials: referenceMaterials,
+        subject: newSubject,
+        examTitle: aiTopic,
+        queryTexts: [aiTopic, newTitle].filter(Boolean),
+        maxItems: 8,
+      });
       const data = await generateExamWithAi({
         subject: newSubject,
         topic: aiTopic,
@@ -447,6 +470,7 @@ export function ExamsView({
         tfCount: aiTfCount,
         shortCount: aiShortCount,
         essayCount: aiEssayCount,
+        referenceContext,
       });
       const normalized: ExamQuestion[] = (data.questions || []).map(
         (q: Partial<ExamQuestion>, idx: number) => {
@@ -739,10 +763,15 @@ export function ExamsView({
     const classOptions = Array.from(
       new Set(allExamSubs.map((s) => getSubClassLabel(s)).filter(Boolean))
     );
+    const cohortEffort = summarizeCohortEffort(examSubs, [activeExam]);
     const filteredSubs = examSubs.filter((s) => {
       const q = searchSub.trim().toLowerCase();
-      if (!q) return true;
-      return s.studentName.toLowerCase().includes(q);
+      if (q && !s.studentName.toLowerCase().includes(q)) return false;
+      if (effortFilter !== 'all') {
+        const eff = cohortEffort.bySubmissionId.get(s.id);
+        if (!eff || eff.level !== effortFilter) return false;
+      }
+      return true;
     });
 
     const handleExportCSV = () => {
@@ -1010,6 +1039,105 @@ export function ExamsView({
           onSelectClassFilter={setClassFilter}
           exportPrefix={activeExam.examCode}
         />
+
+        {/* Perfunctory Behavior Detection Banner for this Exam */}
+        {examSubs.length > 0 && (
+          <section className="bg-white border border-[#DAE5E0] rounded-2xl p-5 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-serif text-lg font-semibold text-[#0D221D] flex items-center gap-2">
+                  {cohortEffort.perfunctoryCount > 0 ? (
+                    <ShieldAlert className="w-4 h-4 text-[#B91C1C]" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-[#0F6D4F]" />
+                  )}
+                  <span>Phân tích học sinh làm bài đối phó trong đề này</span>
+                </h2>
+                <p className="text-xs text-[#597169] mt-0.5">
+                  Đánh giá tự động dựa trên thời gian trả lời từng câu (&lt;5s), lặp đáp án A/B/C/D, bỏ trống tự luận và số lần vi phạm.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {(['all', 'perfunctory', 'watch', 'serious'] as const).map((lvl) => {
+                  const count =
+                    lvl === 'all'
+                      ? examSubs.length
+                      : lvl === 'perfunctory'
+                        ? cohortEffort.perfunctoryCount
+                        : lvl === 'watch'
+                          ? cohortEffort.watchCount
+                          : cohortEffort.seriousCount;
+                  const label =
+                    lvl === 'all'
+                      ? 'Tất cả'
+                      : lvl === 'perfunctory'
+                        ? 'Đối phó'
+                        : lvl === 'watch'
+                          ? 'Cần lưu ý'
+                          : 'Nghiêm túc';
+                  const active = effortFilter === lvl;
+                  return (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setEffortFilter(lvl)}
+                      className={`px-2.5 py-1 rounded-lg border font-semibold cursor-pointer tabular-nums ${
+                        active
+                          ? lvl === 'perfunctory'
+                            ? 'bg-[#B91C1C] border-[#B91C1C] text-white'
+                            : lvl === 'watch'
+                              ? 'bg-[#8A630D] border-[#8A630D] text-white'
+                              : 'bg-[#0F4C3F] border-[#0F4C3F] text-white'
+                          : 'bg-[#F8FAF9] border-[#DAE5E0] text-[#3A524A] hover:bg-[#EFF7F3]'
+                      }`}
+                    >
+                      {label} ({count})
+                    </button>
+                  );
+                })}
+                {cohortEffort.perfunctoryCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSubIds(
+                        new Set(cohortEffort.flaggedItems.map((it) => it.submission.id))
+                      );
+                      setEffortFilter('perfunctory');
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C] font-semibold hover:bg-[#FEE2E2] cursor-pointer"
+                  >
+                    Chọn {cohortEffort.perfunctoryCount} bài đối phó
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {cohortEffort.flaggedItems.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {cohortEffort.flaggedItems.slice(0, 6).map(({ submission: sub, analysis }) => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => onSelectSubmission(sub.id)}
+                    className="p-3 rounded-xl border border-[#FECACA] bg-[#FEF2F2]/60 text-left hover:bg-[#FEE2E2]/60 transition-colors cursor-pointer space-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-semibold text-[#0D221D] truncate">
+                        {sub.studentName} {sub.className ? `(${sub.className})` : ''}
+                      </span>
+                      <span className="font-mono font-semibold text-[#B91C1C] shrink-0">
+                        {analysis.riskScore}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#991B1B] line-clamp-2">
+                      {analysis.reasons.join(' · ')}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1486,6 +1614,7 @@ export function ExamsView({
                     const fastCount = sub.answers.filter(
                       (a) => a.timeSpentSeconds > 0 && a.timeSpentSeconds < 5
                     ).length;
+                    const eff = cohortEffort.bySubmissionId.get(sub.id);
                     const isChecked = selectedSubIds.has(sub.id);
                     const isConfirming = confirmDeleteSubId === sub.id;
                     const isDeleting = deletingSubId === sub.id;
@@ -1518,7 +1647,25 @@ export function ExamsView({
                           />
                         </td>
                         <td className="py-3.5 pr-4 font-medium text-[#0D221D]">
-                          <div>{sub.studentName}</div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span>{sub.studentName}</span>
+                            {eff && eff.level === 'perfunctory' && (
+                              <span
+                                title={eff.reasons.join(' • ')}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FEF2F2] border border-[#FECACA] text-[10px] font-semibold text-[#B91C1C]"
+                              >
+                                <ShieldAlert className="w-3 h-3" /> Đối phó ({eff.riskScore}%)
+                              </span>
+                            )}
+                            {eff && eff.level === 'watch' && (
+                              <span
+                                title={eff.reasons.join(' • ')}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FDF8EB] border border-[#EAD8A6] text-[10px] font-semibold text-[#8A630D]"
+                              >
+                                <AlertTriangle className="w-3 h-3" /> Lưu ý
+                              </span>
+                            )}
+                          </div>
                           {sub.studentCode && (
                             <div className="text-[11px] font-mono text-[#597169]">
                               Mã HS: {sub.studentCode}
@@ -1532,7 +1679,17 @@ export function ExamsView({
                           {formatDurationMMSS(sub.durationSeconds)}
                         </td>
                         <td className="py-3.5 pr-4 text-xs">
-                          {sub.violationCount > 3 ? (
+                          {eff && eff.reasons.length > 0 ? (
+                            <span
+                              className={
+                                eff.level === 'perfunctory'
+                                  ? 'text-[#B91C1C] font-medium'
+                                  : 'text-[#8A630D]'
+                              }
+                            >
+                              {eff.reasons[0]}
+                            </span>
+                          ) : sub.violationCount > 3 ? (
                             <span className="text-[#B91C1C] font-semibold">
                               {sub.violationCount} vi phạm · Ép buộc nộp
                             </span>
@@ -1545,7 +1702,7 @@ export function ExamsView({
                               {fastCount} câu &lt;5s
                             </span>
                           ) : (
-                            <span className="text-[#597169]">không vi phạm</span>
+                            <span className="text-[#0F6D4F]">Nghiêm túc</span>
                           )}
                         </td>
                         <td className="py-3.5 pr-4 font-semibold tabular-nums text-[#0D221D]">
