@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   BookMarked,
+  BookOpen,
   Check,
   CheckCircle2,
   Edit3,
@@ -17,7 +18,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { type ChangeEvent, useMemo, useState } from 'react';
+import { type ChangeEvent, useMemo, useRef, useState } from 'react';
 import {
   createReferenceMaterialsChunked,
   deleteReferenceMaterial,
@@ -29,6 +30,7 @@ import {
 } from '../services/firestoreService';
 import {
   generateExplanationsWithAi,
+  parseReferencePdfChunkWithAi,
   parseReferenceWordWithAi,
 } from '../services/geminiService';
 import type {
@@ -39,6 +41,10 @@ import type {
   ReferenceQuestionItem,
 } from '../types';
 import { parseDocxForReferenceBank } from '../utils/docxParser';
+import {
+  inspectPdfFile,
+  slicePdfPagesToBase64Chunks,
+} from '../utils/pdfExtractor';
 import { MathText } from './MathText';
 
 interface ReferenceBankViewProps {
@@ -110,7 +116,7 @@ export function ReferenceBankView({
 
   // Import / Create Modal state
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importMode, setImportMode] = useState<'word' | 'exam' | 'manual'>('word');
+  const [importMode, setImportMode] = useState<'word' | 'pdf' | 'exam' | 'manual'>('word');
   const [impTitle, setImpTitle] = useState('');
   const [impSubject, setImpSubject] = useState('Vật lí');
   const [impTopic, setImpTopic] = useState('');
@@ -127,6 +133,18 @@ export function ReferenceBankView({
   const [impError, setImpError] = useState<string | null>(null);
   const [impSaving, setImpSaving] = useState(false);
   const [selectedSourceExamId, setSelectedSourceExamId] = useState('');
+
+  // PDF textbook import states
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+  const [pdfSizeMb, setPdfSizeMb] = useState(0);
+  const [pdfStartPage, setPdfStartPage] = useState(1);
+  const [pdfEndPage, setPdfEndPage] = useState(1);
+  const [pdfInspecting, setPdfInspecting] = useState(false);
+  const [pdfExtracting, setPdfExtracting] = useState(false);
+  const [pdfProgressText, setPdfProgressText] = useState<string | null>(null);
+  const [pdfGenTheoryPractice, setPdfGenTheoryPractice] = useState(true);
+  const pdfCancelRef = useRef(false);
 
   const subjects = useMemo(() => {
     const set = new Set<string>();
@@ -201,6 +219,16 @@ export function ReferenceBankView({
     setImpWarnings([]);
     setImpError(null);
     setSelectedSourceExamId('');
+    setPdfFile(null);
+    setPdfPageCount(0);
+    setPdfSizeMb(0);
+    setPdfStartPage(1);
+    setPdfEndPage(1);
+    setPdfInspecting(false);
+    setPdfExtracting(false);
+    setPdfProgressText(null);
+    setPdfGenTheoryPractice(true);
+    pdfCancelRef.current = false;
   };
 
   const handleOpenImportModal = () => {
@@ -283,6 +311,151 @@ export function ReferenceBankView({
       );
     } finally {
       setImpAiExtracting(false);
+    }
+  };
+
+  const handleSelectPdfFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImpError(null);
+    setImpWarnings([]);
+    setImpParseMeta(null);
+    setPdfInspecting(true);
+    try {
+      const info = await inspectPdfFile(file);
+      setPdfFile(file);
+      setPdfPageCount(info.pageCount);
+      setPdfSizeMb(info.fileSizeMb);
+      setPdfStartPage(1);
+      setPdfEndPage(Math.min(info.pageCount, 12));
+      setImpSourceFile(file.name);
+      if (!impTitle.trim()) {
+        setImpTitle(file.name.replace(/\.pdf$/i, ''));
+      }
+      if (info.pageCount > 12) {
+        setImpWarnings([
+          `Sách PDF có ${info.pageCount} trang. Mặc định chọn trước trang 1–12 để trích xuất nhanh; Thầy/Cô có thể đổi khoảng trang theo từng chương/bài muốn nạp.`,
+        ]);
+      }
+    } catch (err) {
+      setImpError(
+        err instanceof Error
+          ? err.message
+          : 'Không thể đọc thông tin tệp PDF. Vui lòng kiểm tra lại.'
+      );
+      setPdfFile(null);
+      setPdfPageCount(0);
+    } finally {
+      setPdfInspecting(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleExtractPdfWithAi = async () => {
+    if (!pdfFile || pdfPageCount === 0) {
+      setImpError('Vui lòng chọn tệp sách PDF trước.');
+      return;
+    }
+    const safeStart = Math.max(1, Math.min(pdfStartPage, pdfPageCount));
+    const safeEnd = Math.max(safeStart, Math.min(pdfEndPage, pdfPageCount));
+    const selectedSpan = safeEnd - safeStart + 1;
+    if (selectedSpan > 60) {
+      setImpError(
+        `Bạn đang chọn ${selectedSpan} trang một lúc. Vui lòng chọn tối đa 60 trang mỗi lượt (hoặc tách theo từng chương) để AI trích xuất chính xác và không bị quá tải.`
+      );
+      return;
+    }
+
+    setImpError(null);
+    setImpWarnings([]);
+    setPdfExtracting(true);
+    pdfCancelRef.current = false;
+    setPdfProgressText(`Đang tách trang ${safeStart}–${safeEnd} từ sách PDF...`);
+
+    try {
+      const chunks = await slicePdfPagesToBase64Chunks(
+        pdfFile,
+        safeStart,
+        safeEnd,
+        6
+      );
+      const summaryParts: string[] = [];
+      const collectedItems: ReferenceQuestionItem[] = [];
+      const seenPrompts = new Set<string>();
+      let detectedTitle = impTitle.trim();
+      let detectedSubject = impSubject.trim();
+      let detectedTopic = impTopic.trim();
+      let detectedGrade = impGrade.trim();
+
+      for (let i = 0; i < chunks.length; i++) {
+        if (pdfCancelRef.current) {
+          setImpWarnings([
+            `Đã dừng trích xuất sau ${i}/${chunks.length} phần. Dữ liệu đã đọc tới hiện tại vẫn được giữ lại bên dưới.`,
+          ]);
+          break;
+        }
+        const chunk = chunks[i];
+        setPdfProgressText(
+          `AI đang đọc sách PDF: trang ${chunk.startPage}–${chunk.endPage} (lượt ${i + 1}/${chunks.length})...`
+        );
+
+        const res = await parseReferencePdfChunkWithAi({
+          pdfBase64: chunk.base64,
+          startPage: chunk.startPage,
+          endPage: chunk.endPage,
+          subjectHint: detectedSubject || impSubject,
+          titleHint: detectedTitle || pdfFile.name.replace(/\.pdf$/i, ''),
+          generatePracticeIfTheoryOnly: pdfGenTheoryPractice,
+        });
+
+        if (i === 0) {
+          if (!detectedTitle && res.title) detectedTitle = res.title;
+          if (res.subject) detectedSubject = res.subject;
+          if (!detectedTopic && res.topic) detectedTopic = res.topic;
+          if (res.grade) detectedGrade = res.grade;
+        }
+        if (res.knowledgeSummary.trim()) {
+          summaryParts.push(
+            chunks.length > 1
+              ? `[Trang ${chunk.startPage}–${chunk.endPage}]\n${res.knowledgeSummary.trim()}`
+              : res.knowledgeSummary.trim()
+          );
+        }
+        for (const it of res.items) {
+          const normKey = it.prompt.trim().toLowerCase().slice(0, 90);
+          if (normKey && !seenPrompts.has(normKey)) {
+            seenPrompts.add(normKey);
+            collectedItems.push(it);
+          }
+        }
+      }
+
+      if (detectedTitle) setImpTitle(detectedTitle);
+      if (detectedSubject) setImpSubject(detectedSubject);
+      if (detectedTopic) setImpTopic(detectedTopic);
+      if (detectedGrade) setImpGrade(detectedGrade);
+
+      const mergedSummary = summaryParts.join('\n\n').slice(0, 8000);
+      if (mergedSummary) {
+        setImpSummary(mergedSummary);
+      }
+      if (collectedItems.length > 0) {
+        setImpItems(collectedItems);
+      }
+
+      setImpSourceFile(`${pdfFile.name} (tr. ${safeStart}–${safeEnd})`);
+      setImpParseMeta(
+        `AI đã đọc xong trang ${safeStart}–${safeEnd} sách PDF: trích xuất phần kiến thức trọng tâm và ${collectedItems.length} câu hỏi chuẩn kèm lời giải.`
+      );
+    } catch (err) {
+      setImpError(
+        err instanceof Error
+          ? err.message
+          : 'Không thể trích xuất dữ liệu từ sách PDF.'
+      );
+    } finally {
+      setPdfExtracting(false);
+      setPdfProgressText(null);
     }
   };
 
@@ -469,8 +642,9 @@ export function ReferenceBankView({
             Kho dữ liệu chuẩn cho AI
           </h1>
           <p className="text-sm text-[#4A615A] max-w-2xl leading-relaxed">
-            Nạp ngân hàng câu hỏi, công thức và lời giải mẫu từ file Word (.docx). AI sẽ tự động
-            lấy dữ liệu chuẩn tại đây làm căn cứ khi tạo đề tự luyện cho học sinh và soạn đề mới.
+            Nạp ngân hàng câu hỏi, công thức và lời giải mẫu từ file Word (.docx) hoặc sách/tài liệu
+            PDF (.pdf). AI sẽ tự động lấy dữ liệu chuẩn tại đây làm căn cứ khi tạo đề tự luyện cho
+            học sinh và soạn đề mới.
           </p>
         </div>
 
@@ -592,18 +766,20 @@ export function ReferenceBankView({
               Chưa có bộ dữ liệu chuẩn nào trong kho
             </h2>
             <p className="text-sm text-[#4A615A] leading-relaxed">
-              Hãy tải lên file Word (.docx) ngân hàng câu hỏi, đề cương chuyên đề hoặc lấy từ đề
+              Hãy tải lên file Word (.docx), sách giáo khoa/tài liệu PDF (.pdf) hoặc lấy từ đề
               chuẩn sẵn có. AI sẽ bám sát tài liệu này khi tạo bài ôn tập cho học sinh.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleOpenImportModal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] cursor-pointer"
-          >
-            <Upload className="w-4 h-4 text-[#E5C665]" />
-            <span>Nạp file Word (.docx) chuẩn ngay</span>
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={handleOpenImportModal}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0F4C3F] text-white text-sm font-semibold hover:bg-[#0A362C] cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-[#E5C665]" />
+              <span>Nạp file Word / Sách PDF chuẩn</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -1362,11 +1538,12 @@ export function ReferenceBankView({
 
             <div className="p-6 space-y-5">
               {/* Source Tabs */}
-              <div className="flex flex-wrap gap-2 p-1 rounded-xl bg-[#E6EEEA]">
+              <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-[#E6EEEA]">
                 {(
                   [
-                    { id: 'word', label: 'Nạp từ file Word (.docx)', icon: Upload },
-                    { id: 'exam', label: 'Lấy từ đề chuẩn có sẵn', icon: FileText },
+                    { id: 'word', label: 'File Word (.docx)', icon: Upload },
+                    { id: 'pdf', label: 'Sách / Tài liệu PDF', icon: BookOpen },
+                    { id: 'exam', label: 'Từ đề có sẵn', icon: FileText },
                     { id: 'manual', label: 'Soạn thủ công', icon: Edit3 },
                   ] as const
                 ).map((tab) => {
@@ -1380,7 +1557,7 @@ export function ReferenceBankView({
                         setImportMode(tab.id);
                         setImpError(null);
                       }}
-                      className={`flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer ${
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer ${
                         active
                           ? 'bg-white text-[#0F4C3F] shadow-xs'
                           : 'text-[#4A615A] hover:text-[#0D221D]'
@@ -1414,7 +1591,7 @@ export function ReferenceBankView({
                       <div className="space-y-1.5">
                         <Upload className="w-7 h-7 text-[#0F4C3F] mx-auto" />
                         <div className="text-sm font-semibold text-[#0D221D]">
-                          {impSourceFile
+                          {impSourceFile && importMode === 'word'
                             ? `Đã chọn: ${impSourceFile} (bấm để chọn file khác)`
                             : 'Chọn file Word (.docx) ngân hàng câu hỏi hoặc chuyên đề ôn tập'}
                         </div>
@@ -1448,6 +1625,144 @@ export function ReferenceBankView({
                           </>
                         )}
                       </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PDF Textbook Import Area */}
+              {importMode === 'pdf' && (
+                <div className="space-y-3">
+                  <label className="block border-2 border-dashed border-[#B5CCC2] hover:border-[#0F4C3F] rounded-2xl p-6 text-center bg-[#F8FAF9] cursor-pointer transition-colors">
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      className="hidden"
+                      onChange={handleSelectPdfFile}
+                    />
+                    {pdfInspecting ? (
+                      <div className="flex flex-col items-center gap-2 text-[#0F4C3F]">
+                        <Loader2 className="w-7 h-7 animate-spin" />
+                        <span className="text-sm font-semibold">
+                          Đang kiểm tra số trang và dung lượng file PDF...
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <BookOpen className="w-7 h-7 text-[#0F4C3F] mx-auto" />
+                        <div className="text-sm font-semibold text-[#0D221D]">
+                          {pdfFile
+                            ? `Đã chọn: ${pdfFile.name} (${pdfPageCount} trang · ${pdfSizeMb} MB)`
+                            : 'Chọn file sách PDF (.pdf) — SGK, sách bài tập hoặc đề cương'}
+                        </div>
+                        <p className="text-xs text-[#597169]">
+                          AI đọc trực tiếp cả PDF chữ in lẫn PDF scan hình ảnh, công thức Toán/Lí/Hoá và tự tách kiến thức trọng tâm cùng câu hỏi mẫu.
+                        </p>
+                      </div>
+                    )}
+                  </label>
+
+                  {pdfFile && pdfPageCount > 0 && (
+                    <div className="p-4 rounded-xl bg-[#FDF8EB] border border-[#EAD8A6] space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-xs font-semibold text-[#7A580B]">
+                          Chọn khoảng trang muốn trích xuất (tổng {pdfPageCount} trang)
+                        </div>
+                        {pdfPageCount <= 60 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPdfStartPage(1);
+                              setPdfEndPage(pdfPageCount);
+                            }}
+                            className="text-xs font-semibold text-[#0F4C3F] hover:underline cursor-pointer"
+                          >
+                            Chọn cả {pdfPageCount} trang
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs items-end">
+                        <label className="space-y-1">
+                          <span className="font-semibold text-[#3A524A]">Từ trang</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={pdfPageCount}
+                            value={pdfStartPage}
+                            onChange={(e) => {
+                              const v = Math.max(
+                                1,
+                                Math.min(Number(e.target.value) || 1, pdfPageCount)
+                              );
+                              setPdfStartPage(v);
+                              if (v > pdfEndPage) setPdfEndPage(v);
+                            }}
+                            className="w-full px-3 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-sm text-[#0D221D] tabular-nums"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="font-semibold text-[#3A524A]">Đến trang</span>
+                          <input
+                            type="number"
+                            min={pdfStartPage}
+                            max={pdfPageCount}
+                            value={pdfEndPage}
+                            onChange={(e) => {
+                              const v = Math.max(
+                                pdfStartPage,
+                                Math.min(Number(e.target.value) || pdfStartPage, pdfPageCount)
+                              );
+                              setPdfEndPage(v);
+                            }}
+                            className="w-full px-3 py-1.5 rounded-lg border border-[#CEDCD6] bg-white text-sm text-[#0D221D] tabular-nums"
+                          />
+                        </label>
+
+                        <div className="col-span-2 flex flex-wrap items-center justify-end gap-2">
+                          {pdfExtracting ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                pdfCancelRef.current = true;
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#B91C1C] bg-white text-[#B91C1C] text-xs font-semibold hover:bg-[#FEF2F2] cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Dừng lại</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleExtractPdfWithAi()}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] whitespace-nowrap shrink-0 cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-[#E5C665]" />
+                              <span>
+                                Đọc &amp; trích xuất trang {pdfStartPage}–{pdfEndPage}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-2 text-xs text-[#597169] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={pdfGenTheoryPractice}
+                          onChange={(e) => setPdfGenTheoryPractice(e.target.checked)}
+                        />
+                        <span>
+                          Nếu trang sách chỉ có lý thuyết/công thức, cho AI tự soạn thêm 3–5 câu mẫu bám sát trang đó
+                        </span>
+                      </label>
+
+                      {pdfProgressText && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-[#EAD8A6] text-xs font-medium text-[#0F4C3F]">
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                          <span>{pdfProgressText}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

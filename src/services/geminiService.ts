@@ -1338,6 +1338,74 @@ Hãy đánh giá toàn diện bằng tiếng Việt thân thiện, rõ ràng, tr
   }
 }
 
+function normalizeAiReferenceItems(
+  rawItems: unknown,
+  fallbackTopic: string,
+  idPrefix: string
+): ReferenceQuestionItem[] {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems.slice(0, 60).map((item, idx) => {
+    const raw = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+    const rawType = String(raw.type || 'mcq');
+    const type: ReferenceQuestionItem['type'] =
+      rawType === 'true_false' ||
+      rawType === 'short_answer' ||
+      rawType === 'essay'
+        ? rawType
+        : 'mcq';
+    const rawDiff = String(raw.difficulty || 'thong_hieu');
+    const difficulty: ReferenceDifficulty =
+      rawDiff === 'nhan_biet' || rawDiff === 'van_dung'
+        ? rawDiff
+        : 'thong_hieu';
+    return {
+      id: `${idPrefix}_${idx + 1}_${Date.now().toString(36)}`,
+      type,
+      topicTag: String(raw.topicTag || fallbackTopic || 'Chuyên đề chuẩn').slice(0, 120),
+      difficulty,
+      prompt: String(raw.prompt || '').slice(0, 2500),
+      ...(type === 'mcq'
+        ? {
+            options:
+              Array.isArray(raw.options) && raw.options.length >= 4
+                ? raw.options.slice(0, 4).map((o) => String(o || '').slice(0, 600))
+                : ['Phương án A', 'Phương án B', 'Phương án C', 'Phương án D'],
+            correctOption:
+              typeof raw.correctOption === 'number'
+                ? Math.min(Math.max(Math.round(raw.correctOption), 0), 3)
+                : 0,
+          }
+        : {}),
+      ...(type === 'true_false'
+        ? {
+            statements:
+              Array.isArray(raw.statements) && raw.statements.length >= 4
+                ? raw.statements.slice(0, 4).map((st: unknown, sIdx: number) => {
+                    const sObj = (st && typeof st === 'object' ? st : {}) as {
+                      text?: unknown;
+                      isTrue?: unknown;
+                    };
+                    return {
+                      text: String(sObj.text || `Mệnh đề ${'abcd'[sIdx]}`).slice(0, 600),
+                      isTrue: Boolean(sObj.isTrue),
+                    };
+                  })
+                : [
+                    { text: 'Mệnh đề a', isTrue: true },
+                    { text: 'Mệnh đề b', isTrue: false },
+                    { text: 'Mệnh đề c', isTrue: true },
+                    { text: 'Mệnh đề d', isTrue: false },
+                  ],
+          }
+        : {}),
+      ...(type === 'short_answer'
+        ? { correctAnswer: String(raw.correctAnswer || '').slice(0, 40) }
+        : {}),
+      explanation: String(raw.explanation || '').slice(0, 2500),
+    };
+  });
+}
+
 // 10. Parse & normalize Word (.docx) reference material (question bank or topic handout)
 export interface ParseReferenceWordInput {
   annotatedText: string;
@@ -1442,70 +1510,148 @@ ${input.annotatedText.slice(0, 42000)}`;
       items?: Array<Record<string, unknown>>;
     }>(response.text);
 
-    const normalizedItems: ReferenceQuestionItem[] = Array.isArray(parsed.items)
-      ? parsed.items.slice(0, 60).map((raw, idx) => {
-          const rawType = String(raw.type || 'mcq');
-          const type: ReferenceQuestionItem['type'] =
-            rawType === 'true_false' ||
-            rawType === 'short_answer' ||
-            rawType === 'essay'
-              ? rawType
-              : 'mcq';
-          const rawDiff = String(raw.difficulty || 'thong_hieu');
-          const difficulty: ReferenceDifficulty =
-            rawDiff === 'nhan_biet' || rawDiff === 'van_dung'
-              ? rawDiff
-              : 'thong_hieu';
-          return {
-            id: `ref_ai_${idx + 1}_${Date.now().toString(36)}`,
-            type,
-            topicTag: String(raw.topicTag || parsed.topic || 'Chuyên đề chuẩn').slice(0, 120),
-            difficulty,
-            prompt: String(raw.prompt || '').slice(0, 2500),
-            ...(type === 'mcq'
-              ? {
-                  options:
-                    Array.isArray(raw.options) && raw.options.length >= 4
-                      ? raw.options.slice(0, 4).map((o) => String(o || '').slice(0, 600))
-                      : ['Phương án A', 'Phương án B', 'Phương án C', 'Phương án D'],
-                  correctOption:
-                    typeof raw.correctOption === 'number'
-                      ? Math.min(Math.max(Math.round(raw.correctOption), 0), 3)
-                      : 0,
-                }
-              : {}),
-            ...(type === 'true_false'
-              ? {
-                  statements:
-                    Array.isArray(raw.statements) && raw.statements.length >= 4
-                      ? raw.statements.slice(0, 4).map((st: unknown, sIdx: number) => {
-                          const sObj = (st && typeof st === 'object' ? st : {}) as {
-                            text?: unknown;
-                            isTrue?: unknown;
-                          };
-                          return {
-                            text: String(sObj.text || `Mệnh đề ${'abcd'[sIdx]}`).slice(0, 600),
-                            isTrue: Boolean(sObj.isTrue),
-                          };
-                        })
-                      : [
-                          { text: 'Mệnh đề a', isTrue: true },
-                          { text: 'Mệnh đề b', isTrue: false },
-                          { text: 'Mệnh đề c', isTrue: true },
-                          { text: 'Mệnh đề d', isTrue: false },
-                        ],
-                }
-              : {}),
-            ...(type === 'short_answer'
-              ? { correctAnswer: String(raw.correctAnswer || '').slice(0, 40) }
-              : {}),
-            explanation: String(raw.explanation || '').slice(0, 2500),
-          };
-        })
-      : [];
+    const normalizedItems = normalizeAiReferenceItems(
+      parsed.items,
+      parsed.topic || 'Chuyên đề chuẩn',
+      'ref_ai'
+    );
 
     return {
       title: String(parsed.title || input.titleHint || 'Tài liệu chuẩn AI').slice(0, 200),
+      subject: String(parsed.subject || input.subjectHint || 'Vật lí').slice(0, 80),
+      topic: String(parsed.topic || '').slice(0, 160),
+      grade: String(parsed.grade || 'THPT').slice(0, 40),
+      knowledgeSummary: String(parsed.knowledgeSummary || '').slice(0, 8000),
+      items: normalizedItems,
+    };
+  } catch (error) {
+    throw toFriendlyAiError(error);
+  }
+}
+
+// 11. Parse & extract structured curriculum knowledge + questions directly from a PDF book/chapter chunk
+export interface ParseReferencePdfInput {
+  pdfBase64: string;
+  startPage: number;
+  endPage: number;
+  subjectHint?: string;
+  titleHint?: string;
+  generatePracticeIfTheoryOnly?: boolean;
+}
+
+export async function parseReferencePdfChunkWithAi(
+  input: ParseReferencePdfInput
+): Promise<ParseReferenceWordOutput> {
+  if (!input.pdfBase64) {
+    throw new Error('Thiếu dữ liệu PDF để trích xuất.');
+  }
+
+  try {
+    const ai = getGeminiClient();
+    const pageLabel =
+      input.startPage === input.endPage
+        ? `trang ${input.startPage}`
+        : `từ trang ${input.startPage} đến trang ${input.endPage}`;
+
+    const instruction = `Bạn là chuyên gia biên tập học liệu & ngân hàng câu hỏi chuẩn Chương trình GDPT 2018 cho môn "${input.subjectHint || 'Tổng hợp'}".
+Đính kèm ở trên là trích đoạn sách giáo khoa / sách tham khảo / tài liệu PDF (${pageLabel}). Hãy đọc thật kỹ CẢ chữ in, bảng số liệu, hình vẽ minh hoạ, hộp công thức và các bài tập trong PDF (kể cả nếu PDF là bản scan).
+
+Nhiệm vụ của bạn:
+1. "title", "subject", "topic", "grade": Nhận diện tên chương/bài học chính trong đoạn PDF, môn học, chuyên đề và khối lớp (gợi ý tên tệp: "${input.titleHint || ''}").
+2. "knowledgeSummary": Tóm tắt súc tích nhưng đầy đủ kiến thức cốt lõi, định nghĩa, định luật, công thức quan trọng (kèm đơn vị chuẩn và điều kiện áp dụng), lỗi sai thường gặp có trong đoạn sách này.
+3. "items": Trích xuất TOÀN BỘ ví dụ mẫu, câu hỏi trắc nghiệm, Đúng/Sai, trả lời ngắn hoặc bài tập cuối bài xuất hiện trong đoạn PDF này (tối đa 35 câu mỗi lượt).
+   ${
+     input.generatePracticeIfTheoryOnly !== false
+       ? '- Nếu đoạn PDF này chủ yếu là lý thuyết/bài học mà có ít câu hỏi bài tập, hãy tự biên soạn thêm 3-5 câu hỏi mẫu chuẩn (ưu tiên Trắc nghiệm / Đúng-Sai / Trả lời ngắn) bám sát chính xác công thức và ví dụ trong đoạn sách vừa đọc.'
+       : ''
+   }
+   - Mỗi phần tử trong "items":
+     * "type": "mcq" | "true_false" | "short_answer" | "essay"
+     * "topicTag": Tên mục/dạng bài ngắn gọn (VD: "Định luật Charles", "Khảo sát hàm số")
+     * "difficulty": "nhan_biet" | "thong_hieu" | "van_dung"
+     * "prompt": Nội dung câu hỏi rõ ràng, đầy đủ dữ kiện (nếu đề trong sách có bảng số liệu ngắn thì chép đủ số liệu vào đề).
+     * Với "mcq": "options" gồm đúng 4 phương án (không kèm A./B./C./D.), "correctOption" (0..3).
+     * Với "true_false": "statements" gồm 4 mệnh đề { text, isTrue }.
+     * Với "short_answer": "correctAnswer" là đáp số ngắn gọn (VD "2,5" hoặc "120").
+     * "explanation": Lời giải chuẩn từng bước theo phương pháp của sách giáo khoa (tự giải chi tiết nếu sách chỉ ghi đáp án hoặc chưa ghi lời giải).
+4. Mọi công thức Toán/Vật lí/Hoá học PHẢI viết bằng LaTeX chuẩn đặt trong $...$ hoặc $$...$$ (escape \\ đúng chuẩn JSON).`;
+
+    const response = await generateContentWithRetry(ai, {
+      timeoutMs: 42_000,
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'application/pdf',
+              data: input.pdfBase64,
+            },
+          },
+          { text: instruction },
+        ],
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            subject: { type: Type.STRING },
+            topic: { type: Type.STRING },
+            grade: { type: Type.STRING },
+            knowledgeSummary: { type: Type.STRING },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: { type: Type.STRING },
+                  topicTag: { type: Type.STRING },
+                  difficulty: { type: Type.STRING },
+                  prompt: { type: Type.STRING },
+                  options: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  correctOption: { type: Type.INTEGER },
+                  statements: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        text: { type: Type.STRING },
+                        isTrue: { type: Type.BOOLEAN },
+                      },
+                    },
+                  },
+                  correctAnswer: { type: Type.STRING },
+                  explanation: { type: Type.STRING },
+                },
+                required: ['type', 'topicTag', 'difficulty', 'prompt', 'explanation'],
+              },
+            },
+          },
+          required: ['title', 'subject', 'topic', 'knowledgeSummary', 'items'],
+        },
+      },
+    });
+
+    const parsed = parseAiJson<{
+      title?: string;
+      subject?: string;
+      topic?: string;
+      grade?: string;
+      knowledgeSummary?: string;
+      items?: Array<Record<string, unknown>>;
+    }>(response.text);
+
+    const normalizedItems = normalizeAiReferenceItems(
+      parsed.items,
+      parsed.topic || input.titleHint || 'Sách PDF chuẩn',
+      `ref_pdf_p${input.startPage}`
+    );
+
+    return {
+      title: String(parsed.title || input.titleHint || 'Tài liệu PDF chuẩn').slice(0, 200),
       subject: String(parsed.subject || input.subjectHint || 'Vật lí').slice(0, 80),
       topic: String(parsed.topic || '').slice(0, 160),
       grade: String(parsed.grade || 'THPT').slice(0, 40),
