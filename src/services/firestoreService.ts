@@ -19,8 +19,12 @@ import type {
   ClassRoster,
   ClassRosterEntry,
   Classroom,
+  EssayCriterionResult,
   Exam,
   ExamQuestion,
+  HandwrittenCheck,
+  HomeworkSession,
+  HomeworkStatus,
   ParentMessage,
   StudentAnswer,
   StudentRecord,
@@ -1804,3 +1808,270 @@ export async function deleteParentMessage(messageId: string): Promise<void> {
     handleFirestoreError(err, OperationType.DELETE, `parentMessages/${messageId}`);
   }
 }
+
+export async function upsertParentMessageByRef(input: {
+  teacherId: string;
+  refId: string;
+  studentName: string;
+  className: string;
+  examTitle: string;
+  parentPhone: string;
+  content: string;
+  existingMessages?: ParentMessage[];
+}): Promise<string> {
+  const safeRef = input.refId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128);
+  const hit = input.existingMessages?.find((m) => m.submissionId === safeRef);
+  if (hit) {
+    await updateParentMessageStatus(hit.id, {
+      content: input.content,
+      parentPhone: input.parentPhone,
+    });
+    return hit.id;
+  }
+  return saveParentMessage({
+    teacherId: input.teacherId,
+    submissionId: safeRef,
+    studentName: input.studentName,
+    className: input.className,
+    examTitle: input.examTitle,
+    parentPhone: input.parentPhone,
+    content: input.content,
+    status: 'draft',
+  });
+}
+
+// ==========================================
+// Homework Check-in Sessions (STT Grid & Multi-Session Matrix)
+// ==========================================
+
+function toMillis(ts: unknown): number {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (typeof (ts as { toMillis?: () => number }).toMillis === 'function') {
+    return (ts as { toMillis: () => number }).toMillis();
+  }
+  if (typeof (ts as { seconds?: number }).seconds === 'number') {
+    return Number((ts as { seconds: number }).seconds) * 1000;
+  }
+  return 0;
+}
+
+export function subscribeHomeworkSessions(
+  teacherId: string,
+  onSessions: (items: HomeworkSession[]) => void,
+  onError?: (err: unknown) => void
+): () => void {
+  const path = 'homeworkSessions';
+  return onSnapshot(
+    query(collection(db, path), where('teacherId', '==', teacherId)),
+    (snap) => {
+      const rows = snap.docs.map((d) => d.data() as HomeworkSession);
+      rows.sort((a, b) => {
+        const dateCmp = (b.dateLabel || '').localeCompare(a.dateLabel || '');
+        if (dateCmp !== 0) return dateCmp;
+        return toMillis(b.createdAt) - toMillis(a.createdAt);
+      });
+      onSessions(rows);
+    },
+    (err) => {
+      if (onError) onError(err);
+      else handleFirestoreError(err, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function createHomeworkSession(input: {
+  teacherId: string;
+  classId: string;
+  className: string;
+  title: string;
+  dateLabel: string;
+  statuses?: Record<string, HomeworkStatus>;
+}): Promise<HomeworkSession> {
+  const id = makeSafeId('hw');
+  const cleanStatuses: Record<string, HomeworkStatus> = {};
+  if (input.statuses) {
+    Object.entries(input.statuses)
+      .slice(0, 200)
+      .forEach(([k, v]) => {
+        if (v === 'submitted' || v === 'missing' || v === 'incomplete') {
+          cleanStatuses[clampStr(k, 128)] = v;
+        }
+      });
+  }
+
+  const payload = {
+    id,
+    teacherId: input.teacherId,
+    classId: clampStr(input.classId, 128),
+    className: clampStr(input.className, 100) || 'Lớp học',
+    title: clampStr(input.title, 160) || 'Kiểm tra bài tập',
+    dateLabel: clampStr(input.dateLabel, 30) || new Date().toISOString().slice(0, 10),
+    statuses: cleanStatuses,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  try {
+    await setDoc(doc(db, 'homeworkSessions', id), payload);
+    return payload;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, `homeworkSessions/${id}`);
+  }
+}
+
+export async function updateHomeworkSessionStatuses(
+  sessionId: string,
+  statuses: Record<string, HomeworkStatus>
+): Promise<void> {
+  const cleanStatuses: Record<string, HomeworkStatus> = {};
+  Object.entries(statuses)
+    .slice(0, 200)
+    .forEach(([k, v]) => {
+      if (k && (v === 'submitted' || v === 'missing' || v === 'incomplete')) {
+        cleanStatuses[clampStr(k, 128)] = v;
+      }
+    });
+
+  try {
+    await updateDoc(doc(db, 'homeworkSessions', sessionId), {
+      statuses: cleanStatuses,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `homeworkSessions/${sessionId}`);
+  }
+}
+
+export async function updateHomeworkSessionMeta(
+  sessionId: string,
+  patch: { title?: string; dateLabel?: string; className?: string }
+): Promise<void> {
+  const updatePayload: Record<string, unknown> = {
+    updatedAt: serverTimestamp(),
+  };
+  if (patch.title !== undefined) updatePayload.title = clampStr(patch.title, 160);
+  if (patch.dateLabel !== undefined) updatePayload.dateLabel = clampStr(patch.dateLabel, 30);
+  if (patch.className !== undefined) updatePayload.className = clampStr(patch.className, 100);
+
+  try {
+    await updateDoc(doc(db, 'homeworkSessions', sessionId), updatePayload);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `homeworkSessions/${sessionId}`);
+  }
+}
+
+export async function deleteHomeworkSession(sessionId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'homeworkSessions', sessionId));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `homeworkSessions/${sessionId}`);
+  }
+}
+
+// ==========================================
+// Handwritten Oral/Quiz AI Checks
+// ==========================================
+
+export function subscribeHandwrittenChecks(
+  teacherId: string,
+  onChecks: (items: HandwrittenCheck[]) => void,
+  onError?: (err: unknown) => void
+): () => void {
+  const path = 'handwrittenChecks';
+  return onSnapshot(
+    query(collection(db, path), where('teacherId', '==', teacherId)),
+    (snap) => {
+      const rows = snap.docs.map((d) => d.data() as HandwrittenCheck);
+      rows.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+      onChecks(rows);
+    },
+    (err) => {
+      if (onError) onError(err);
+      else handleFirestoreError(err, OperationType.LIST, path);
+    }
+  );
+}
+
+export async function saveHandwrittenCheck(input: {
+  teacherId: string;
+  classId?: string;
+  className?: string;
+  studentId?: string;
+  studentName: string;
+  studentCode?: string;
+  promptText?: string;
+  score: number;
+  maxScore: number;
+  recognizedText: string;
+  strengths?: string;
+  mistakes?: string;
+  teacherComment: string;
+  breakdown: EssayCriterionResult[];
+}): Promise<HandwrittenCheck> {
+  const id = makeSafeId('chk');
+  const maxScore = Math.min(Math.max(Number(input.maxScore || 10), 0.25), 100);
+  const score = Number(Math.min(Math.max(Number(input.score || 0), 0), maxScore).toFixed(2));
+  const cleanBreakdown = (input.breakdown || []).slice(0, 12).map((b) => ({
+    criterion: clampStr(b.criterion, 300),
+    score: Number(Number(b.score || 0).toFixed(2)),
+    maxScore: Number(Number(b.maxScore || 0).toFixed(2)),
+    met: Boolean(b.met),
+  }));
+
+  const payload = {
+    id,
+    teacherId: input.teacherId,
+    classId: clampStr(input.classId, 128),
+    className: clampStr(input.className, 100),
+    studentId: clampStr(input.studentId, 128),
+    studentName: clampStr(input.studentName, 120) || 'Học sinh',
+    studentCode: clampStr(input.studentCode, 40),
+    promptText: clampStr(input.promptText, 1000),
+    score,
+    maxScore,
+    recognizedText: clampStr(input.recognizedText, 4000),
+    strengths: clampStr(input.strengths, 1000),
+    mistakes: clampStr(input.mistakes, 1000),
+    teacherComment: clampStr(input.teacherComment, 1000),
+    breakdown: cleanBreakdown,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  try {
+    await setDoc(doc(db, 'handwrittenChecks', id), payload);
+    return payload;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.CREATE, `handwrittenChecks/${id}`);
+  }
+}
+
+export async function updateHandwrittenCheck(
+  checkId: string,
+  patch: { score?: number; teacherComment?: string }
+): Promise<void> {
+  const updatePayload: Record<string, unknown> = {
+    updatedAt: serverTimestamp(),
+  };
+  if (patch.score !== undefined) {
+    updatePayload.score = Number(Math.min(Math.max(Number(patch.score || 0), 0), 100).toFixed(2));
+  }
+  if (patch.teacherComment !== undefined) {
+    updatePayload.teacherComment = clampStr(patch.teacherComment, 1000);
+  }
+  try {
+    await updateDoc(doc(db, 'handwrittenChecks', checkId), updatePayload);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `handwrittenChecks/${checkId}`);
+  }
+}
+
+export async function deleteHandwrittenCheck(checkId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'handwrittenChecks', checkId));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `handwrittenChecks/${checkId}`);
+  }
+}
+

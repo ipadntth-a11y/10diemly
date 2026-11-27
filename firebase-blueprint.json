@@ -562,6 +562,131 @@
         }
       },
       "required": ["id", "teacherId", "title", "subject", "topic", "grade", "sourceFileName", "knowledgeSummary", "items", "itemCount", "isActiveForAi", "createdAt", "updatedAt"]
+    },
+    "HomeworkSession": {
+      "title": "HomeworkSession",
+      "description": "Fast homework submission check-in session for a class keyed by student IDs and ordered via class roster STT",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "teacherId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "className": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "dateLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30
+        },
+        "statuses": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "teacherId", "classId", "className", "title", "dateLabel", "statuses", "createdAt", "updatedAt"]
+    },
+    "HandwrittenCheck": {
+      "title": "HandwrittenCheck",
+      "description": "AI-graded handwritten oral/short quiz result captured by teacher photo",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "teacherId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "className": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "studentId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "studentCode": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "promptText": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "score": {
+          "type": "number"
+        },
+        "maxScore": {
+          "type": "number"
+        },
+        "recognizedText": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "strengths": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "mistakes": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "teacherComment": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "breakdown": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "teacherId", "studentName", "score", "maxScore", "recognizedText", "teacherComment", "breakdown", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -604,6 +729,14 @@
     "/referenceMaterials/{materialId}": {
       "schema": { "$ref": "#/entities/ReferenceMaterial" },
       "description": "Standard question banks and curriculum notes uploaded by teachers to ground AI generation"
+    },
+    "/homeworkSessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/HomeworkSession" },
+      "description": "Fast STT-based homework check-in sessions owned by teachers"
+    },
+    "/handwrittenChecks/{checkId}": {
+      "schema": { "$ref": "#/entities/HandwrittenCheck" },
+      "description": "Quick handwritten oral/quiz AI grading logs owned by teachers"
     }
   }
 }

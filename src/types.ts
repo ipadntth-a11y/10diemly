@@ -163,6 +163,8 @@ export interface ClassRoster {
 export type TeacherNavTab =
   | 'overview'
   | 'classes'
+  | 'homework_check'
+  | 'oral_ai_check'
   | 'exams'
   | 'reference_bank'
   | 'messages';
@@ -250,6 +252,40 @@ export interface StudentJournal {
   className: string;
   studentCode?: string;
   entries: StudentJournalEntry[];
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export type HomeworkStatus = 'submitted' | 'missing' | 'incomplete';
+
+export interface HomeworkSession {
+  id: string;
+  teacherId: string;
+  classId: string;
+  className: string;
+  title: string;
+  dateLabel: string;
+  statuses: Record<string, HomeworkStatus>;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface HandwrittenCheck {
+  id: string;
+  teacherId: string;
+  classId?: string;
+  className?: string;
+  studentId?: string;
+  studentName: string;
+  studentCode?: string;
+  promptText?: string;
+  score: number;
+  maxScore: number;
+  recognizedText: string;
+  strengths?: string;
+  mistakes?: string;
+  teacherComment: string;
+  breakdown: EssayCriterionResult[];
   createdAt?: unknown;
   updatedAt?: unknown;
 }

@@ -34,6 +34,7 @@ import {
   formatDurationMMSS,
   formatScore,
   getScoreTier,
+  sanitizeConciseRemark,
 } from '../utils/formatters';
 import { compressExamPhoto } from '../utils/imageUtils';
 import { MathText } from './MathText';
@@ -322,8 +323,20 @@ export function SubmissionDetailView({
         questionSummaries: summaries,
       });
       setAiAnalysis(data.analysis || '');
-      if (!teacherComment.trim() && data.suggestedComment) {
-        setTeacherComment(data.suggestedComment);
+      if (data.suggestedComment) {
+        const cleanComment = sanitizeConciseRemark(data.suggestedComment, 195);
+        if (!teacherComment.trim()) {
+          setTeacherComment(cleanComment);
+          setParentMessageText(
+            buildDefaultParentMessage(
+              submission.studentName,
+              submission.examTitle,
+              computedTotal,
+              submission.maxScore,
+              cleanComment
+            )
+          );
+        }
       }
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Lỗi kết nối Gemini.');
@@ -376,8 +389,9 @@ export function SubmissionDetailView({
       }
     );
 
-    setAnswers((prev) =>
-      prev.map((a) => {
+    let nextTotal = computedTotal;
+    setAnswers((prev) => {
+      const updated = prev.map((a) => {
         const hit = resultMap.get(a.questionId);
         if (!hit) return a;
         const clamped = Math.min(Math.max(Number(hit.proposedScore || 0), 0), a.maxScore);
@@ -389,11 +403,27 @@ export function SubmissionDetailView({
           aiFeedback: hit.feedback,
           aiBreakdown: hit.breakdown,
         };
-      })
-    );
+      });
+      nextTotal = Number(
+        updated.reduce((sum, a) => sum + Number(a.score || 0), 0).toFixed(2)
+      );
+      return updated;
+    });
 
-    if (data.overallNote && !teacherComment.trim()) {
-      setTeacherComment(data.overallNote);
+    if (data.overallNote) {
+      const cleanNote = sanitizeConciseRemark(data.overallNote, 195);
+      if (!teacherComment.trim()) {
+        setTeacherComment(cleanNote);
+        setParentMessageText(
+          buildDefaultParentMessage(
+            submission.studentName,
+            submission.examTitle,
+            nextTotal,
+            submission.maxScore,
+            cleanNote
+          )
+        );
+      }
     }
   };
 
@@ -1350,6 +1380,27 @@ export function SubmissionDetailView({
               onChange={(e) => setParentMessageText(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-[#DAE5E0] bg-[#F8FAF9] text-xs text-[#3A524A] leading-relaxed focus:outline-none focus:border-[#0F4C3F]"
             />
+
+            <div className="flex items-center justify-between gap-2 text-[11px] text-[#698078]">
+              <span>{parentMessageText.length} ký tự (gọn cho Zalo/SMS)</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setParentMessageText(
+                    buildDefaultParentMessage(
+                      submission.studentName,
+                      submission.examTitle,
+                      computedTotal,
+                      submission.maxScore,
+                      teacherComment
+                    )
+                  )
+                }
+                className="font-semibold text-[#0F4C3F] hover:text-[#0A362C] cursor-pointer"
+              >
+                Đồng bộ từ lời phê
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <button

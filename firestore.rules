@@ -201,6 +201,44 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidHomeworkSession(data) {
+      return data.keys().hasAll(['id', 'teacherId', 'classId', 'className', 'title', 'dateLabel', 'statuses', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'teacherId', 'classId', 'className', 'title', 'dateLabel', 'statuses', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.teacherId)
+        && data.teacherId == request.auth.uid
+        && isValidId(data.classId)
+        && data.className is string && data.className.size() >= 1 && data.className.size() <= 100
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 160
+        && data.dateLabel is string && data.dateLabel.size() >= 1 && data.dateLabel.size() <= 30
+        && data.statuses is map && data.statuses.size() <= 200
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidHandwrittenCheck(data) {
+      return data.keys().hasAll(['id', 'teacherId', 'studentName', 'score', 'maxScore', 'recognizedText', 'teacherComment', 'breakdown', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'teacherId', 'classId', 'className', 'studentId', 'studentName', 'studentCode', 'promptText', 'score', 'maxScore', 'recognizedText', 'strengths', 'mistakes', 'teacherComment', 'breakdown', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.teacherId)
+        && data.teacherId == request.auth.uid
+        && (!('classId' in data) || (data.classId is string && data.classId.size() <= 128))
+        && (!('className' in data) || (data.className is string && data.className.size() <= 100))
+        && (!('studentId' in data) || (data.studentId is string && data.studentId.size() <= 128))
+        && (!('studentCode' in data) || (data.studentCode is string && data.studentCode.size() <= 40))
+        && (!('promptText' in data) || (data.promptText is string && data.promptText.size() <= 1000))
+        && (!('strengths' in data) || (data.strengths is string && data.strengths.size() <= 1000))
+        && (!('mistakes' in data) || (data.mistakes is string && data.mistakes.size() <= 1000))
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120
+        && data.score is number && data.score >= 0 && data.score <= 100
+        && data.maxScore is number && data.maxScore > 0 && data.maxScore <= 100
+        && data.recognizedText is string && data.recognizedText.size() <= 4000
+        && data.teacherComment is string && data.teacherComment.size() <= 1000
+        && data.breakdown is list && data.breakdown.size() <= 12 && (data.breakdown.size() == 0 || data.breakdown[0] is map)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     // /users/{userId}
     match /users/{userId} {
       allow get: if isVerified() && isValidId(userId) && request.auth.uid == userId;
@@ -440,6 +478,49 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'subject', 'topic', 'grade', 'sourceFileName', 'knowledgeSummary', 'items', 'itemCount', 'isActiveForAi', 'updatedAt']);
       allow delete: if isVerified() && isValidId(materialId) && existing().teacherId == request.auth.uid;
+    }
+
+    // /homeworkSessions/{sessionId}
+    match /homeworkSessions/{sessionId} {
+      allow get: if isVerified() && isValidId(sessionId) && existing().teacherId == request.auth.uid;
+      allow list: if isVerified() && existing().teacherId == request.auth.uid;
+      allow create: if isVerified() && isValidId(sessionId)
+        && isValidHomeworkSession(incoming())
+        && incoming().id == sessionId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/classes/$(incoming().classId))
+        && get(/databases/$(database)/documents/classes/$(incoming().classId)).data.teacherId == request.auth.uid;
+      allow update: if isVerified() && isValidId(sessionId)
+        && existing().teacherId == request.auth.uid
+        && isValidHomeworkSession(incoming())
+        && incoming().id == existing().id
+        && incoming().teacherId == existing().teacherId
+        && incoming().classId == existing().classId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['className', 'title', 'dateLabel', 'statuses', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(sessionId) && existing().teacherId == request.auth.uid;
+    }
+
+    // /handwrittenChecks/{checkId}
+    match /handwrittenChecks/{checkId} {
+      allow get: if isVerified() && isValidId(checkId) && existing().teacherId == request.auth.uid;
+      allow list: if isVerified() && existing().teacherId == request.auth.uid;
+      allow create: if isVerified() && isValidId(checkId)
+        && isValidHandwrittenCheck(incoming())
+        && incoming().id == checkId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(checkId)
+        && existing().teacherId == request.auth.uid
+        && isValidHandwrittenCheck(incoming())
+        && incoming().id == existing().id
+        && incoming().teacherId == existing().teacherId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['score', 'teacherComment', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(checkId) && existing().teacherId == request.auth.uid;
     }
   }
 }

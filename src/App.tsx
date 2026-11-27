@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ClassesView } from './components/ClassesView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ExamsView } from './components/ExamsView';
+import { HomeworkCheckView } from './components/HomeworkCheckView';
 import { LandingView } from './components/LandingView';
+import { OralCheckAiView } from './components/OralCheckAiView';
 import { OverviewView } from './components/OverviewView';
 import { ParentMessagesView } from './components/ParentMessagesView';
 import { ReferenceBankView } from './components/ReferenceBankView';
@@ -396,6 +398,25 @@ function AppShell() {
               openCreateModalSignal={openClassModalSignal}
               onConsumeCreateSignal={() => setOpenClassModalSignal(0)}
             />
+          ) : activeTab === 'homework_check' ? (
+            <HomeworkCheckView
+              teacherId={user.uid}
+              classes={classes}
+              parentMessages={parentMessages}
+              onOpenParentMessagesTab={() => setActiveTab('messages')}
+              onQuickCreateClass={() => {
+                setActiveTab('classes');
+                setOpenClassModalSignal((n) => n + 1);
+              }}
+            />
+          ) : activeTab === 'oral_ai_check' ? (
+            <OralCheckAiView
+              teacherId={user.uid}
+              classes={classes}
+              exams={exams}
+              parentMessages={parentMessages}
+              onOpenParentMessagesTab={() => setActiveTab('messages')}
+            />
           ) : activeTab === 'exams' ? (
             activeSubmission ? (
               <SubmissionDetailView
@@ -413,6 +434,7 @@ function AppShell() {
                 classes={classes}
                 exams={exams}
                 submissions={submissions}
+                parentMessages={parentMessages}
                 referenceMaterials={referenceMaterials}
                 selectedExamId={selectedExamId}
                 onSelectExam={(id) => {

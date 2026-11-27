@@ -10,21 +10,42 @@ import type {
   ReferenceQuestionItem,
 } from '../types';
 import type { ReferenceContextPayload } from './referenceBankService';
+import { sanitizeConciseRemark } from '../utils/formatters';
 
 const PRIMARY_MODEL = 'gemini-4-hydrogen';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite';
 const HYDROGEN_COOLDOWN_MS = 60_000;
 
 let hydrogenCooldownUntil = 0;
+let activeKeyIndex = 0;
+
+function getConfiguredApiKeys(): string[] {
+  const primary = String(import.meta.env.VITE_GEMINI_API_KEY ?? '').trim();
+  const extras = String(import.meta.env.VITE_GEMINI_API_KEYS ?? '')
+    .split(/[\s,;]+/)
+    .map((k) => k.trim())
+    .filter(Boolean);
+  return Array.from(new Set([primary, ...extras].filter(Boolean)));
+}
 
 function getGeminiClient(): GoogleGenAI {
-  const apiKey = (import.meta.env.VITE_GEMINI_API_KEY ?? '').trim();
-  if (!apiKey) {
+  const keys = getConfiguredApiKeys();
+  if (keys.length === 0) {
     throw new Error(
       'Chưa cấu hình biến môi trường VITE_GEMINI_API_KEY. Vui lòng thêm VITE_GEMINI_API_KEY vào Environment Variables trên Vercel (hoặc tệp .env) rồi triển khai lại.'
     );
   }
-  return new GoogleGenAI({ apiKey });
+  const idx = activeKeyIndex % keys.length;
+  return new GoogleGenAI({ apiKey: keys[idx] });
+}
+
+function isQuotaError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    message.includes('429') ||
+    message.includes('resource_exhausted') ||
+    message.includes('quota')
+  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -123,7 +144,10 @@ async function generateContentWithRetry(
         { model: BACKUP_MODEL, delayMs: 500, timeoutMs: baseTimeout + 3000 },
       ];
 
+  const keys = getConfiguredApiKeys();
+  let currentClient = ai;
   let lastError: unknown;
+
   for (const attempt of attempts) {
     if (attempt.delayMs > 0) {
       await sleep(attempt.delayMs);
@@ -136,13 +160,18 @@ async function generateContentWithRetry(
         ...(params.config ?? {}),
         abortSignal: controller.signal,
       };
-      return await ai.models.generateContent({
+      return await currentClient.models.generateContent({
         model: attempt.model,
         contents: params.contents as never,
         config: mergedConfig as never,
       });
     } catch (err) {
       lastError = err;
+      if (isQuotaError(err) && keys.length > 1) {
+        activeKeyIndex = (activeKeyIndex + 1) % keys.length;
+        currentClient = new GoogleGenAI({ apiKey: keys[activeKeyIndex] });
+        console.warn(`Quota hit on key, switching to backup key #${activeKeyIndex + 1}...`);
+      }
       if (attempt.model === PRIMARY_MODEL && isTransientAiError(err)) {
         hydrogenCooldownUntil = Date.now() + HYDROGEN_COOLDOWN_MS;
       }
@@ -255,9 +284,9 @@ Hãy phân tích sâu bằng tiếng Việt chuẩn sư phạm và trả về JS
 1. "analysis": Báo cáo chi tiết theo 4 ý rõ ràng (dùng gạch đầu dòng ngắn gọn):
    - Nhịp độ & hành vi làm bài theo thời gian (so sánh thời gian làm mỗi câu với TB lớp, chỉ rõ các câu trả lời quá nhanh <5s nghi chọn đại/đối phó và các câu sa lầy mất nhiều thời gian nhưng vẫn sai).
    - Năng lực theo từng dạng câu (Trắc nghiệm, Đúng/Sai, Trả lời ngắn/Tự luận).
-   - Các câu/mạch kiến thức học sinh đang hổng (nêu cụ thể số câu).
+    - Các câu/mạch kiến thức học sinh đang hổng (nêu cụ thể số câu).
    - Lộ trình ôn tập 2 bước tiếp theo cho học sinh này.
-2. "suggestedComment": Lời phê ngắn gọn 1-2 câu (tối đa 220 ký tự) để giáo viên điền vào ô Lời phê.`;
+2. "suggestedComment": Lời phê ngắn gọn 1-2 câu (TỐI ĐA 180 ký tự), súc tích, đủ ý để điền ô Lời phê và gửi thẳng vào khung tin nhắn phụ huynh (nêu rõ: điểm nổi bật + lỗi chính hoặc thái độ/tốc độ + hướng khắc phục; văn phong tự nhiên, KHÔNG dùng markdown hay ký hiệu $ LaTeX).`;
 
     const response = await generateContentWithRetry(ai, {
       contents: prompt,
@@ -279,7 +308,7 @@ Hãy phân tích sâu bằng tiếng Việt chuẩn sư phạm và trả về JS
     );
     return {
       analysis: String(parsed.analysis || ''),
-      suggestedComment: String(parsed.suggestedComment || ''),
+      suggestedComment: sanitizeConciseRemark(parsed.suggestedComment || '', 195),
     };
   } catch (error) {
     throw toFriendlyAiError(error);
@@ -312,6 +341,7 @@ export interface GradeEssayItemResult {
   proposedScore: number;
   recognizedText: string;
   feedback: string;
+  shortSummary?: string;
   breakdown: EssayCriterionResult[];
 }
 
@@ -353,6 +383,7 @@ export async function gradeEssayWithAi(
         proposedScore: 0,
         recognizedText: '(Học sinh bỏ trống bài làm)',
         feedback: 'Học sinh bỏ trống bài làm tự luận (không viết lời giải hoặc ảnh chụp).',
+        shortSummary: 'Chưa làm bài tự luận.',
         breakdown: [
           {
             criterion: 'Công thức áp dụng / Phương pháp giải',
@@ -410,7 +441,8 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
 2. "recognizedText": Chép lại chính xác bài làm đọc được từ ảnh viết tay (hoặc từ văn bản học sinh). Mọi công thức Toán/Vật lí/Hoá học viết bằng LaTeX chuẩn trong $...$ hoặc $$...$$ (escape \\ đúng chuẩn JSON).
 3. "breakdown": Mảng các tiêu chí chấm theo barem trên, mỗi phần tử gồm { criterion, score, maxScore, met }. Tổng maxScore bằng ${maxS}, tổng score bằng "proposedScore".
 4. "proposedScore": Tổng điểm đạt được từ breakdown (từ 0 đến ${maxS}).
-5. "feedback": Nhận xét rõ từng mục: công thức đã đúng chưa, thay số/đổi đơn vị ra sao, đáp số thế nào, có thiếu/sai đơn vị không, và hướng dẫn cách sửa ngắn gọn (dùng $...$ cho công thức).`;
+5. "feedback": Nhận xét chi tiết từng mục: công thức đã đúng chưa, thay số/đổi đơn vị ra sao, đáp số thế nào, có thiếu/sai đơn vị không, và hướng dẫn cách sửa ngắn gọn (dùng $...$ cho công thức).
+6. "shortSummary": ĐÚNG 1 câu nhận xét thật súc tích, đủ ý (tối đa 140 ký tự, văn phong tự nhiên gửi thẳng trong tin nhắn phụ huynh, KHÔNG dùng ký hiệu $ hay markdown) nêu rõ điểm đạt được và lỗi chính cần sửa.`;
 
     parts.push({ text: instruction });
 
@@ -425,6 +457,7 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
             recognizedText: { type: Type.STRING },
             proposedScore: { type: Type.NUMBER },
             feedback: { type: Type.STRING },
+            shortSummary: { type: Type.STRING },
             breakdown: {
               type: Type.ARRAY,
               items: {
@@ -439,7 +472,7 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
               },
             },
           },
-          required: ['recognizedText', 'proposedScore', 'feedback', 'breakdown'],
+          required: ['recognizedText', 'proposedScore', 'feedback', 'shortSummary', 'breakdown'],
         },
       },
     });
@@ -448,6 +481,7 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
       recognizedText?: string;
       proposedScore?: number;
       feedback?: string;
+      shortSummary?: string;
       breakdown?: EssayCriterionResult[];
     }>(response.text);
 
@@ -467,6 +501,7 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
       proposedScore: Number(clampedScore.toFixed(2)),
       recognizedText: String(parsed.recognizedText || ''),
       feedback: String(parsed.feedback || ''),
+      shortSummary: sanitizeConciseRemark(parsed.shortSummary || parsed.feedback || '', 155),
       breakdown: rawBreakdown,
     };
   };
@@ -489,12 +524,26 @@ QUY TẮC CHẤM BAREM TỰ LUẬN BẮT BUỘC:
     throw toFriendlyAiError(firstError);
   }
 
-  const overallNote =
-    results.length === 1
-      ? results[0].feedback
-      : `Đã chấm xong ${results.length} câu tự luận theo barem. ${results
-          .map((r) => `${r.questionId.toUpperCase()}: ${r.proposedScore}đ`)
-          .join(', ')}.`;
+  let overallNote = '';
+  if (results.length === 1) {
+    overallNote = sanitizeConciseRemark(
+      results[0].shortSummary || results[0].feedback,
+      190
+    );
+  } else {
+    const scorePart = results
+      .map((r) => `${r.questionId.toUpperCase()}: ${r.proposedScore}đ`)
+      .join(', ');
+    const keyIssue =
+      results.find((r) => r.shortSummary && r.shortSummary !== 'Chưa làm bài tự luận.')
+        ?.shortSummary ||
+      results[0]?.shortSummary ||
+      '';
+    overallNote = sanitizeConciseRemark(
+      `Tự luận (${scorePart})${keyIssue ? `. ${keyIssue}` : '.'}`,
+      195
+    );
+  }
 
   return {
     results,
@@ -616,7 +665,7 @@ Hãy trả về JSON:
       breakdown: rawBreakdown,
       strengths: String(parsed.strengths || ''),
       mistakes: String(parsed.mistakes || ''),
-      teacherComment: String(parsed.teacherComment || ''),
+      teacherComment: sanitizeConciseRemark(parsed.teacherComment || '', 195),
     };
   } catch (error) {
     throw toFriendlyAiError(error);

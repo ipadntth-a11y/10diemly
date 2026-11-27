@@ -14,15 +14,17 @@ import {
   Image as ImageIcon,
   Lock,
   Plus,
+  RefreshCw,
   Search,
   ShieldAlert,
   Sparkles,
+  Square,
   Trash2,
   Unlock,
   Upload,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PHYSICS_12_QUESTIONS } from '../data/seedData';
 import {
   createExam,
@@ -35,6 +37,12 @@ import {
   updateExam,
 } from '../services/firestoreService';
 import {
+  batchAnalyzeSubmissionsWithAi,
+  batchRegradeSubmissionsWithAi,
+  type BatchAiProgress,
+  type BatchAiResult,
+} from '../services/batchGradingService';
+import {
   generateExamWithAi,
   generateExplanationsWithAi,
   parseWordExamWithAi,
@@ -45,6 +53,7 @@ import type {
   EffortLevel,
   Exam,
   ExamQuestion,
+  ParentMessage,
   QuestionType,
   ReferenceMaterial,
   Submission,
@@ -72,6 +81,7 @@ interface ExamsViewProps {
   classes?: Classroom[];
   exams: Exam[];
   submissions: Submission[];
+  parentMessages?: ParentMessage[];
   referenceMaterials?: ReferenceMaterial[];
   selectedExamId: string | null;
   onSelectExam: (examId: string | null) => void;
@@ -86,6 +96,7 @@ export function ExamsView({
   classes = [],
   exams,
   submissions,
+  parentMessages = [],
   referenceMaterials = [],
   selectedExamId,
   onSelectExam,
@@ -143,6 +154,17 @@ export function ExamsView({
   const [deletingSubId, setDeletingSubId] = useState<string | null>(null);
   const [subActionError, setSubActionError] = useState<string | null>(null);
 
+  // Batch AI re-grading & batch analysis state
+  const [batchPanelMode, setBatchPanelMode] = useState<'none' | 'regrade' | 'analyze'>('none');
+  const [batchCustomBarem, setBatchCustomBarem] = useState('');
+  const [batchAlsoAnalyze, setBatchAlsoAnalyze] = useState(true);
+  const [batchOverwriteComment, setBatchOverwriteComment] = useState(true);
+  const [batchSyncMessages, setBatchSyncMessages] = useState(true);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<BatchAiProgress | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchAiResult | null>(null);
+  const batchAbortRef = useRef(false);
+
   useEffect(() => {
     if (openCreateModalSignal > 0) {
       setShowCreateModal(true);
@@ -157,6 +179,10 @@ export function ExamsView({
     setConfirmBulkDelete(false);
     setConfirmDeleteSubId(null);
     setSubActionError(null);
+    setBatchPanelMode('none');
+    setBatchResult(null);
+    setBatchProgress(null);
+    batchAbortRef.current = true;
   }, [selectedExamId]);
 
   const activeExam = exams.find((e) => e.id === selectedExamId) || null;
@@ -841,6 +867,85 @@ export function ExamsView({
     const allFilteredSelected =
       filteredSubs.length > 0 && filteredSubs.every((s) => selectedSubIds.has(s.id));
 
+    const targetBatchSubs =
+      selectedSubIds.size > 0
+        ? filteredSubs.filter((s) => selectedSubIds.has(s.id))
+        : filteredSubs;
+
+    const handleRunBatchRegrade = async () => {
+      if (targetBatchSubs.length === 0 || batchRunning) return;
+      batchAbortRef.current = false;
+      setBatchRunning(true);
+      setBatchResult(null);
+      setSubActionError(null);
+      setBatchProgress({
+        completed: 0,
+        total: targetBatchSubs.length,
+        currentStudentName: targetBatchSubs[0].studentName,
+        phase: 'regrading',
+      });
+      try {
+        const res = await batchRegradeSubmissionsWithAi({
+          teacherId,
+          exam: activeExam,
+          targetSubmissions: targetBatchSubs,
+          allExamSubmissions: allExamSubs,
+          customBarem: batchCustomBarem,
+          alsoAnalyzeAfterRegrade: batchAlsoAnalyze,
+          overwriteComment: batchOverwriteComment,
+          syncParentMessages: batchSyncMessages,
+          existingMessages: parentMessages,
+          shouldAbort: () => batchAbortRef.current,
+          onProgress: (p) => setBatchProgress(p),
+        });
+        setBatchResult(res);
+        setBatchPanelMode('none');
+      } catch (err) {
+        setSubActionError(
+          err instanceof Error ? err.message : 'Lỗi khi chấm lại hàng loạt bằng AI.'
+        );
+      } finally {
+        setBatchRunning(false);
+        setBatchProgress(null);
+      }
+    };
+
+    const handleRunBatchAnalyze = async () => {
+      if (targetBatchSubs.length === 0 || batchRunning) return;
+      batchAbortRef.current = false;
+      setBatchRunning(true);
+      setBatchResult(null);
+      setSubActionError(null);
+      setBatchProgress({
+        completed: 0,
+        total: targetBatchSubs.length,
+        currentStudentName: targetBatchSubs[0].studentName,
+        phase: 'analyzing',
+      });
+      try {
+        const res = await batchAnalyzeSubmissionsWithAi({
+          teacherId,
+          exam: activeExam,
+          targetSubmissions: targetBatchSubs,
+          allExamSubmissions: allExamSubs,
+          overwriteComment: batchOverwriteComment,
+          syncParentMessages: batchSyncMessages,
+          existingMessages: parentMessages,
+          shouldAbort: () => batchAbortRef.current,
+          onProgress: (p) => setBatchProgress(p),
+        });
+        setBatchResult(res);
+        setBatchPanelMode('none');
+      } catch (err) {
+        setSubActionError(
+          err instanceof Error ? err.message : 'Lỗi khi phân tích hàng loạt bằng AI.'
+        );
+      } finally {
+        setBatchRunning(false);
+        setBatchProgress(null);
+      }
+    };
+
     return (
       <div className="space-y-6">
         {/* Top back link & actions */}
@@ -1502,11 +1607,61 @@ export function ExamsView({
                 Danh sách bài nộp ({filteredSubs.length})
               </h2>
               <p className="text-xs text-[#597169] mt-0.5">
-                Có thể chọn và xoá bài làm thử nghiệm để điểm TB, biểu đồ và thống kê câu hỏi phản ánh đúng số liệu thật.
+                Tick chọn từng bài hoặc chạy hàng loạt để AI chấm lại chuẩn barem, phân tích học lực và tạo lời phê ngắn gọn.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              {filteredSubs.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    disabled={batchRunning}
+                    onClick={() => {
+                      setBatchResult(null);
+                      setBatchPanelMode((m) => (m === 'regrade' ? 'none' : 'regrade'));
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60 ${
+                      batchPanelMode === 'regrade'
+                        ? 'bg-[#B0831A] border-[#9A7113] text-white'
+                        : 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D] hover:bg-[#FAF1D6]'
+                    }`}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>
+                      Chấm lại AI (
+                      {selectedSubIds.size > 0
+                        ? `${selectedSubIds.size} bài chọn`
+                        : `${filteredSubs.length} bài`}
+                      )
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={batchRunning}
+                    onClick={() => {
+                      setBatchResult(null);
+                      setBatchPanelMode((m) => (m === 'analyze' ? 'none' : 'analyze'));
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-60 ${
+                      batchPanelMode === 'analyze'
+                        ? 'bg-[#0F4C3F] border-[#0A362C] text-white'
+                        : 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0F4C3F] hover:bg-[#DCECE4]'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>
+                      Phân tích AI (
+                      {selectedSubIds.size > 0
+                        ? `${selectedSubIds.size} bài chọn`
+                        : `${filteredSubs.length} bài`}
+                      )
+                    </span>
+                  </button>
+                </>
+              )}
+
               {selectedSubIds.size > 0 && (
                 <button
                   type="button"
@@ -1543,6 +1698,196 @@ export function ExamsView({
               </div>
             </div>
           </div>
+
+          {/* Batch AI Options Strip */}
+          {batchPanelMode !== 'none' && !batchRunning && targetBatchSubs.length > 0 && (
+            <div className="p-4 rounded-xl border border-[#C5DDD3] bg-[#F8FAF9] space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#0D221D] flex items-center gap-1.5">
+                    {batchPanelMode === 'regrade' ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 text-[#B0831A]" />
+                        <span>
+                          Chấm lại bằng AI cho {targetBatchSubs.length} bài nộp
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-[#0F4C3F]" />
+                        <span>
+                          Phân tích &amp; tạo nhận xét ngắn gọn bằng AI cho {targetBatchSubs.length} bài nộp
+                        </span>
+                      </>
+                    )}
+                  </h3>
+                  <p className="text-xs text-[#597169] mt-0.5">
+                    {batchPanelMode === 'regrade'
+                      ? 'Tính lại điểm trắc nghiệm/Đúng-Sai/điền số theo đáp án mới nhất, đồng thời dùng AI chấm lại toàn bộ câu tự luận/ảnh theo barem 4 bước.'
+                      : 'AI đối chiếu thời gian từng câu, tỉ lệ đúng của lớp và dấu hiệu đối phó để lưu phân tích chi tiết và lời phê ngắn gọn (1–2 câu).'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBatchPanelMode('none')}
+                  className="p-1 rounded-lg text-[#597169] hover:text-[#0D221D] cursor-pointer"
+                  aria-label="Đóng bảng tùy chọn AI"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {batchPanelMode === 'regrade' && (
+                <div>
+                  <label className="block text-xs font-medium text-[#3A524A] mb-1">
+                    Ghi chú barem chấm tự luận bổ sung (tuỳ chọn)
+                  </label>
+                  <input
+                    type="text"
+                    value={batchCustomBarem}
+                    onChange={(e) => setBatchCustomBarem(e.target.value)}
+                    placeholder="VD: Thiếu đơn vị trừ 0.25đ; chấp nhận làm tròn 2 chữ số thập phân..."
+                    className="w-full px-3 py-2 rounded-xl border border-[#CEDCD6] bg-white text-xs text-[#0D221D] focus:outline-none focus:border-[#0F4C3F]"
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[#3A524A]">
+                {batchPanelMode === 'regrade' && (
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={batchAlsoAnalyze}
+                      onChange={(e) => setBatchAlsoAnalyze(e.target.checked)}
+                      className="rounded border-[#CEDCD6] accent-[#0F4C3F]"
+                    />
+                    <span>Kèm phân tích học lực toàn bài bằng AI</span>
+                  </label>
+                )}
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={batchOverwriteComment}
+                    onChange={(e) => setBatchOverwriteComment(e.target.checked)}
+                    className="rounded border-[#CEDCD6] accent-[#0F4C3F]"
+                  />
+                  <span>Cập nhật lời phê ngắn gọn mới (dưới 195 ký tự)</span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={batchSyncMessages}
+                    onChange={(e) => setBatchSyncMessages(e.target.checked)}
+                    className="rounded border-[#CEDCD6] accent-[#0F4C3F]"
+                  />
+                  <span>Đồng bộ sẵn vào Tin nhắn phụ huynh</span>
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setBatchPanelMode('none')}
+                  className="px-3.5 py-1.5 rounded-xl border border-[#CEDCD6] bg-white text-xs font-medium text-[#4A615A] hover:bg-[#EFF7F3] cursor-pointer"
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="button"
+                  onClick={
+                    batchPanelMode === 'regrade'
+                      ? handleRunBatchRegrade
+                      : handleRunBatchAnalyze
+                  }
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0F4C3F] text-white text-xs font-semibold hover:bg-[#0A362C] cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#E5C665]" />
+                  <span>
+                    {batchPanelMode === 'regrade'
+                      ? `Bắt đầu chấm lại (${targetBatchSubs.length} bài)`
+                      : `Bắt đầu phân tích (${targetBatchSubs.length} bài)`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Live Batch AI Progress */}
+          {batchRunning && batchProgress && (
+            <div className="p-4 rounded-xl border border-[#EAD8A6] bg-[#FDF8EB] space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="font-semibold text-[#7A580B]">
+                  {batchProgress.phase === 'regrading'
+                    ? 'Đang chấm lại bằng AI'
+                    : 'Đang phân tích bằng AI'}
+                  : {batchProgress.completed}/{batchProgress.total} bài
+                  {batchProgress.currentStudentName
+                    ? ` — ${batchProgress.currentStudentName}`
+                    : ''}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    batchAbortRef.current = true;
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#EAD8A6] bg-white text-[#8A630D] font-semibold hover:bg-[#FAF1D6] cursor-pointer"
+                >
+                  <Square className="w-3 h-3" />
+                  <span>Dừng lại</span>
+                </button>
+              </div>
+              <div className="h-2 w-full rounded-full bg-[#F3E6C3] overflow-hidden">
+                <div
+                  className="h-full bg-[#0F4C3F] transition-all duration-300"
+                  style={{
+                    width: `${
+                      batchProgress.total > 0
+                        ? Math.max(
+                            6,
+                            Math.round((batchProgress.completed / batchProgress.total) * 100)
+                          )
+                        : 100
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Batch Result Banner */}
+          {batchResult && !batchRunning && (
+            <div
+              className={`p-3.5 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-2 ${
+                batchResult.failedItems.length > 0
+                  ? 'bg-[#FDF8EB] border-[#EAD8A6] text-[#7A580B]'
+                  : 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0A362C]'
+              }`}
+            >
+              <div className="space-y-0.5">
+                <div className="font-semibold">
+                  {batchResult.aborted
+                    ? `Đã dừng sớm — hoàn tất ${batchResult.succeededCount} bài.`
+                    : `Hoàn tất xử lý AI cho ${batchResult.succeededCount} bài nộp.`}
+                </div>
+                {batchResult.failedItems.length > 0 && (
+                  <div className="text-[#991B1B]">
+                    Chưa xử lý được {batchResult.failedItems.length} bài:{' '}
+                    {batchResult.failedItems
+                      .map((f) => `${f.studentName} (${f.error})`)
+                      .join('; ')}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setBatchResult(null)}
+                className="p-1 rounded-lg hover:bg-black/5 cursor-pointer"
+                aria-label="Đóng thông báo"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {confirmBulkDelete && selectedSubIds.size > 0 && (
             <div className="p-3.5 rounded-xl bg-[#FEF2F2] border border-[#FECACA] flex flex-wrap items-center justify-between gap-3 text-xs text-[#991B1B]">
@@ -1666,9 +2011,22 @@ export function ExamsView({
                               </span>
                             )}
                           </div>
-                          {sub.studentCode && (
-                            <div className="text-[11px] font-mono text-[#597169]">
-                              Mã HS: {sub.studentCode}
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#597169] mt-0.5">
+                            {sub.studentCode && (
+                              <span className="font-mono">Mã HS: {sub.studentCode}</span>
+                            )}
+                            {sub.aiAnalysis?.trim() && (
+                              <span className="text-[#0F6D4F] font-medium">
+                                Đã phân tích AI
+                              </span>
+                            )}
+                          </div>
+                          {sub.teacherComment?.trim() && (
+                            <div
+                              title={sub.teacherComment}
+                              className="text-[11px] text-[#4A615A] truncate max-w-xs mt-0.5"
+                            >
+                              {sub.teacherComment}
                             </div>
                           )}
                         </td>
