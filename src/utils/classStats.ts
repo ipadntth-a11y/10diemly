@@ -224,6 +224,16 @@ export function computeClassScoreStats(
   });
 }
 
+export interface StudentSubmissionScoreItem {
+  submissionId: string;
+  examId: string;
+  examTitle: string;
+  score10: number;
+  rawScore: number;
+  maxScore: number;
+  submittedAt: unknown;
+}
+
 export function computeStudentPerformanceInClass(
   student: StudentRecord,
   classroom: Classroom,
@@ -233,6 +243,7 @@ export function computeStudentPerformanceInClass(
   avgScore10: number | null;
   latestScore10: number | null;
   latestSubmissionId: string | null;
+  attempts: StudentSubmissionScoreItem[];
 } {
   const stuCode = normalizeCode(student.studentCode);
   const stuName = normalizeLabel(student.fullName);
@@ -257,16 +268,29 @@ export function computeStudentPerformanceInClass(
       avgScore10: null,
       latestScore10: null,
       latestSubmissionId: null,
+      attempts: [],
     };
   }
 
-  const scores10 = matchedSubs.map(getSubmissionScore10);
-  const avg = scores10.reduce((sum, v) => sum + v, 0) / scores10.length;
+  const attempts: StudentSubmissionScoreItem[] = matchedSubs.map((sub) => ({
+    submissionId: sub.id,
+    examId: sub.examId,
+    examTitle: sub.examTitle,
+    score10: Number(getSubmissionScore10(sub).toFixed(2)),
+    rawScore: sub.totalScore,
+    maxScore: sub.maxScore,
+    submittedAt: sub.submittedAt,
+  }));
+
+  const avg =
+    attempts.reduce((sum, item) => sum + item.score10, 0) / attempts.length;
+
   return {
     submissionCount: matchedSubs.length,
     avgScore10: Number(avg.toFixed(2)),
-    latestScore10: Number(scores10[0].toFixed(2)),
+    latestScore10: attempts[0].score10,
     latestSubmissionId: matchedSubs[0].id,
+    attempts,
   };
 }
 

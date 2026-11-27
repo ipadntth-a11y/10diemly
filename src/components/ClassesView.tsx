@@ -29,6 +29,7 @@ import {
   computeStudentPerformanceInClass,
 } from '../utils/classStats';
 import { analyzeSubmissionEffort } from '../utils/effortAnalysis';
+import { formatScore } from '../utils/formatters';
 
 interface ClassesViewProps {
   teacherId: string;
@@ -51,6 +52,8 @@ export function ClassesView({
 }: ClassesViewProps) {
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [classStatsExamId, setClassStatsExamId] = useState<string>('all');
+  const [scoreDisplayMode, setScoreDisplayMode] = useState<'both' | 'avg' | 'per_exam'>('both');
+  const [expandedStudentIds, setExpandedStudentIds] = useState<Record<string, boolean>>({});
   const pendingClassIdRef = useRef<string | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -601,20 +604,49 @@ export function ClassesView({
                   <div className="text-xs font-semibold uppercase tracking-wider text-[#0F4C3F]">
                     Thống kê điểm lớp {activeClass.name}
                   </div>
-                  {exams.length > 0 && (
-                    <select
-                      value={classStatsExamId}
-                      onChange={(e) => setClassStatsExamId(e.target.value)}
-                      className="px-3 py-1 rounded-lg border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] focus:outline-none focus:border-[#0F4C3F] max-w-[230px]"
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div
+                      className="inline-flex p-0.5 rounded-lg bg-[#E6EEEA] text-[11px] font-medium"
+                      role="group"
+                      aria-label="Kiểu hiển thị kết quả làm bài"
                     >
-                      <option value="all">Tất cả các đề</option>
-                      {exams.map((ex) => (
-                        <option key={ex.id} value={ex.id}>
-                          {ex.title}
-                        </option>
+                      {(
+                        [
+                          { id: 'both', label: 'TB & Từng đề' },
+                          { id: 'avg', label: 'Chỉ Điểm TB' },
+                          { id: 'per_exam', label: 'Theo từng đề' },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setScoreDisplayMode(opt.id)}
+                          className={`px-2.5 py-1 rounded-md whitespace-nowrap cursor-pointer transition-colors ${
+                            scoreDisplayMode === opt.id
+                              ? 'bg-white text-[#0F4C3F] font-semibold shadow-xs'
+                              : 'text-[#4A615A] hover:text-[#0D221D]'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
                       ))}
-                    </select>
-                  )}
+                    </div>
+
+                    {exams.length > 0 && (
+                      <select
+                        value={classStatsExamId}
+                        onChange={(e) => setClassStatsExamId(e.target.value)}
+                        className="px-3 py-1 rounded-lg border border-[#CEDCD6] bg-white text-xs font-medium text-[#0D221D] focus:outline-none focus:border-[#0F4C3F] max-w-[230px]"
+                      >
+                        <option value="all">Tất cả các đề</option>
+                        {exams.map((ex) => (
+                          <option key={ex.id} value={ex.id}>
+                            {ex.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -674,77 +706,213 @@ export function ClassesView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EDF3F0] text-sm">
-                  {filteredStudents.map((stu, idx) => {
+                  {(() => {
                     const examFilteredSubs =
                       classStatsExamId === 'all'
                         ? submissions
                         : submissions.filter((s) => s.examId === classStatsExamId);
-                    const perf = computeStudentPerformanceInClass(
-                      stu,
-                      activeClass,
-                      examFilteredSubs
-                    );
-                    return (
-                    <tr key={stu.id} className="hover:bg-[#F8FAF9] transition-colors">
-                      <td className="py-3 pr-4 text-[#597169] tabular-nums">{idx + 1}</td>
-                      <td className="py-3 pr-4 font-medium text-[#0D221D]">
-                        {stu.fullName}
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-[#4A615A]">
-                        {stu.studentCode || '—'}
-                      </td>
-                      <td className="py-3 pr-4 text-xs tabular-nums">
-                        {perf.submissionCount > 0 && perf.avgScore10 !== null ? (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`px-2 py-0.5 rounded-md font-semibold border ${
-                                perf.avgScore10 >= 6.5
-                                  ? 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0F4C3F]'
-                                  : perf.avgScore10 >= 5
-                                    ? 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D]'
-                                    : 'bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C]'
-                              }`}
-                            >
-                              TB {perf.avgScore10.toFixed(2)}/10
-                            </span>
-                            {(() => {
-                              const latestSub = perf.latestSubmissionId
-                                ? examFilteredSubs.find((s) => s.id === perf.latestSubmissionId)
-                                : undefined;
-                              if (!latestSub) return null;
-                              const effort = analyzeSubmissionEffort(
-                                latestSub,
-                                exams.find((e) => e.id === latestSub.examId)
-                              );
-                              if (effort.level === 'serious') return null;
-                              return (
-                                <span
-                                  title={effort.reasons.join(' • ')}
-                                  className={`px-2 py-0.5 rounded-md border font-semibold ${
-                                    effort.level === 'perfunctory'
-                                      ? 'bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C]'
-                                      : 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D]'
-                                  }`}
-                                >
-                                  {effort.level === 'perfunctory' ? 'Đối phó' : 'Lưu ý'}
-                                </span>
-                              );
-                            })()}
-                            <span className="text-[#597169]">({perf.submissionCount} bài)</span>
-                            {onOpenSubmission && perf.latestSubmissionId && (
-                              <button
-                                type="button"
-                                onClick={() => onOpenSubmission(perf.latestSubmissionId!)}
-                                className="text-[#0F4C3F] font-semibold hover:underline cursor-pointer"
-                              >
-                                Xem
-                              </button>
+                    const examsById = new Map(exams.map((e) => [e.id, e]));
+                    const subsById = new Map(examFilteredSubs.map((s) => [s.id, s]));
+
+                    return filteredStudents.map((stu, idx) => {
+                      const perf = computeStudentPerformanceInClass(
+                        stu,
+                        activeClass,
+                        examFilteredSubs
+                      );
+                      const isExpanded = Boolean(expandedStudentIds[stu.id]);
+                      const examIdCounts = new Map<string, number>();
+                      perf.attempts.forEach((a) => {
+                        examIdCounts.set(a.examId, (examIdCounts.get(a.examId) || 0) + 1);
+                      });
+                      const examAttemptOrdinal = new Map<string, number>();
+                      const maxVisible = scoreDisplayMode === 'per_exam' ? 5 : 3;
+                      const visibleAttempts = isExpanded
+                        ? perf.attempts
+                        : perf.attempts.slice(0, maxVisible);
+                      const hiddenCount = perf.attempts.length - visibleAttempts.length;
+
+                      const latestSub = perf.latestSubmissionId
+                        ? subsById.get(perf.latestSubmissionId)
+                        : undefined;
+                      const latestEffort = latestSub
+                        ? analyzeSubmissionEffort(latestSub, examsById.get(latestSub.examId))
+                        : null;
+
+                      const scoreToneClass = (score10: number) =>
+                        score10 >= 6.5
+                          ? 'bg-[#EFF7F3] border-[#C5DDD3] text-[#0F4C3F]'
+                          : score10 >= 5
+                            ? 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D]'
+                            : 'bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C]';
+
+                      return (
+                        <tr key={stu.id} className="hover:bg-[#F8FAF9] transition-colors align-top">
+                          <td className="py-3 pr-4 text-[#597169] tabular-nums">{idx + 1}</td>
+                          <td className="py-3 pr-4 font-medium text-[#0D221D]">
+                            {stu.fullName}
+                          </td>
+                          <td className="py-3 pr-4 font-mono text-xs text-[#4A615A]">
+                            {stu.studentCode || '—'}
+                          </td>
+                          <td className="py-3 pr-4 text-xs tabular-nums min-w-[230px]">
+                            {perf.submissionCount > 0 && perf.avgScore10 !== null ? (
+                              <div className="space-y-1.5">
+                                {scoreDisplayMode !== 'per_exam' && (
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-md font-semibold border ${scoreToneClass(
+                                        perf.avgScore10
+                                      )}`}
+                                    >
+                                      {perf.submissionCount > 1
+                                        ? `Điểm TB: ${perf.avgScore10.toFixed(2)}/10`
+                                        : classStatsExamId !== 'all'
+                                          ? `Điểm đề: ${perf.avgScore10.toFixed(2)}/10`
+                                          : `Điểm: ${perf.avgScore10.toFixed(2)}/10`}
+                                    </span>
+
+                                    {latestEffort && latestEffort.level !== 'serious' && (
+                                      <span
+                                        title={latestEffort.reasons.join(' • ')}
+                                        className={`px-2 py-0.5 rounded-md border font-semibold ${
+                                          latestEffort.level === 'perfunctory'
+                                            ? 'bg-[#FEF2F2] border-[#FECACA] text-[#B91C1C]'
+                                            : 'bg-[#FDF8EB] border-[#EAD8A6] text-[#8A630D]'
+                                        }`}
+                                      >
+                                        {latestEffort.level === 'perfunctory' ? 'Đối phó' : 'Lưu ý'}
+                                      </span>
+                                    )}
+
+                                    <span className="text-[#597169]">
+                                      ({perf.submissionCount} bài)
+                                    </span>
+
+                                    {scoreDisplayMode === 'avg' &&
+                                      onOpenSubmission &&
+                                      perf.latestSubmissionId && (
+                                        <button
+                                          type="button"
+                                          onClick={() => onOpenSubmission(perf.latestSubmissionId!)}
+                                          className="text-[#0F4C3F] font-semibold hover:underline cursor-pointer"
+                                        >
+                                          Xem gần nhất
+                                        </button>
+                                      )}
+                                  </div>
+                                )}
+
+                                {scoreDisplayMode !== 'avg' && (
+                                  <div className="space-y-1">
+                                    {visibleAttempts.map((att) => {
+                                      const exObj = examsById.get(att.examId);
+                                      const totalSameExam = examIdCounts.get(att.examId) || 1;
+                                      const prevOrd = examAttemptOrdinal.get(att.examId) || 0;
+                                      const curOrd = prevOrd + 1;
+                                      examAttemptOrdinal.set(att.examId, curOrd);
+
+                                      const subObj = subsById.get(att.submissionId);
+                                      const eff = subObj
+                                        ? analyzeSubmissionEffort(subObj, exObj)
+                                        : null;
+                                      const examLabel =
+                                        att.examTitle?.trim() || exObj?.title || 'Đề kiểm tra';
+                                      const duplicateSuffix =
+                                        totalSameExam > 1 ? ` (lần ${totalSameExam - curOrd + 1})` : '';
+                                      const showRaw =
+                                        att.maxScore > 0 && Math.abs(att.maxScore - 10) > 0.01;
+
+                                      return (
+                                        <div
+                                          key={att.submissionId}
+                                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#F8FAF9] border border-[#E6EEEA]"
+                                        >
+                                          <button
+                                            type="button"
+                                            disabled={!onOpenSubmission}
+                                            onClick={() => onOpenSubmission?.(att.submissionId)}
+                                            title={`${examLabel}${duplicateSuffix}${
+                                              exObj?.examCode ? ` · Mã ${exObj.examCode}` : ''
+                                            } — Bấm để xem chi tiết bài làm`}
+                                            className="text-left text-[#3A524A] hover:text-[#0F4C3F] hover:underline truncate max-w-[180px] cursor-pointer disabled:cursor-default"
+                                          >
+                                            {examLabel}
+                                            {duplicateSuffix}
+                                          </button>
+
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            {eff && eff.level !== 'serious' && (
+                                              <span
+                                                title={eff.reasons.join(' • ')}
+                                                className={`text-[10px] font-semibold ${
+                                                  eff.level === 'perfunctory'
+                                                    ? 'text-[#B91C1C]'
+                                                    : 'text-[#8A630D]'
+                                                }`}
+                                              >
+                                                {eff.level === 'perfunctory' ? 'Đối phó' : 'Lưu ý'}
+                                              </span>
+                                            )}
+                                            <button
+                                              type="button"
+                                              disabled={!onOpenSubmission}
+                                              onClick={() => onOpenSubmission?.(att.submissionId)}
+                                              className={`font-mono font-semibold cursor-pointer disabled:cursor-default ${
+                                                att.score10 >= 6.5
+                                                  ? 'text-[#0F4C3F]'
+                                                  : att.score10 >= 5
+                                                    ? 'text-[#8A630D]'
+                                                    : 'text-[#B91C1C]'
+                                              }`}
+                                            >
+                                              {att.score10.toFixed(2)}/10
+                                            </button>
+                                            {showRaw && (
+                                              <span className="text-[10px] text-[#6E857D]">
+                                                ({formatScore(att.rawScore)}/{formatScore(att.maxScore)})
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+
+                                    {hiddenCount > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setExpandedStudentIds((prev) => ({
+                                            ...prev,
+                                            [stu.id]: true,
+                                          }))
+                                        }
+                                        className="text-[11px] font-semibold text-[#0F4C3F] hover:underline cursor-pointer"
+                                      >
+                                        + Xem thêm {hiddenCount} bài nữa
+                                      </button>
+                                    )}
+                                    {isExpanded && perf.attempts.length > maxVisible && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setExpandedStudentIds((prev) => ({
+                                            ...prev,
+                                            [stu.id]: false,
+                                          }))
+                                        }
+                                        className="text-[11px] text-[#597169] hover:underline cursor-pointer"
+                                      >
+                                        Thu gọn
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[#8DA29B]">Chưa nộp bài</span>
                             )}
-                          </div>
-                        ) : (
-                          <span className="text-[#8DA29B]">Chưa nộp bài</span>
-                        )}
-                      </td>
+                          </td>
                       <td className="py-3 pr-4 text-[#3A524A]">
                         {stu.parentName || '—'}
                       </td>
@@ -782,9 +950,10 @@ export function ClassesView({
                           </button>
                         </div>
                       </td>
-                    </tr>
-                    );
-                  })}
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
